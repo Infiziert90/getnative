@@ -9,33 +9,9 @@ import matplotlib.pyplot
 import fvsfunc_getnative as fvs
 
 """
---Original Header--
-Author: kageru https://gist.github.com/kageru/549e059335d6efbae709e567ed081799
-Performance optimizations and other changes: Frechdachs
-Prerequisites:
-matplotlib http://matplotlib.org/users/installing.html
-fmtc: https://github.com/EleonoreMizo/fmtconv/releases
-Depending on source filter:
-ffms2: https://github.com/FFMS/ffms2/releases
-or L-Smash: http://forum.doom9.org/showthread.php?t=167435
-
-and imwri(f) for png/bmp input: 64bit: https://ddl.kageru.moe/kjP6s.7z
-if you need 32bit: http://forum.doom9.org/showthread.php?p=1769737#post1769737
-
-This script's success rate is far from perfect.
-If possible, do multiple tests on different frames from the same source.
-Bright scenes generally yield the most accurate results.
-Graphs tend to have multiple notches, so the script's assumed resolution may be incorrect.
-Also, due to the current implementation of the autoguess, it is not possible for the script 
-to automatically recognize 1080p productions.
-Use your eyes or anibin if necessary.
-
-############################################################################
-
 Reworke by Infi
-Thanks: BluBb_mADe, kageru, FichteFoll, stux!
---New Requirements--
-descale_getnative: https://github.com/Infiziert90/vapoursynth-descale/releases/tag/r3_getnative
+Original Author: kageru https://gist.github.com/kageru/549e059335d6efbae709e567ed081799
+Thanks: BluBb_mADe, FichteFoll, stux!, Frechdachs
 """
 
 # general settings

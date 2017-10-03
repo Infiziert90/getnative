@@ -57,6 +57,15 @@ Output Graph:
 | plot-scaling | Scaling of the y axis. Can be "linear" or "log" | log | String |
 | plot-format | Format of the output image. Can be svg, png, pdf, rgba, jp(e)g, tif(f), and probably more | svg | String |
 
+
+# Warning
+This script's success rate is far from perfect.
+If possible, do multiple tests on different frames from the same source.
+Bright scenes generally yield the most accurate results.
+Graphs tend to have multiple notches, so the script's assumed resolution may be incorrect.
+Also, due to the current implementation of the autoguess, it is not possible for the script 
+to automatically recognize 1080p productions.
+Use your eyes or anibin if necessary.
   
 # Thanks  
 BluBb_mADe, kageru, FichteFoll, stux!
