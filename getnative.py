@@ -21,7 +21,7 @@ targetdir = os.path.join('Desktop', 'getnative')
 
 core = vapoursynth.core
 core.add_cache = False
-imwri = core.imwri if hasattr(core, 'imwri') else core.imwrif
+imwri = getattr(core, "imwri", getattr(core, "imwrif"))
 
 
 class GetNative:
@@ -237,6 +237,9 @@ parser.add_argument('--plot-format', '-pf', dest='plot_format', type=str.lower, 
 def getnative():
     starttime = time.time()
     args = parser.parse_args()
+
+    if (args.img or args.img_out) and imwri is None:
+        return print("Imwri not found, pls install Imwri")
 
     if args.img:
         src = imwri.Read(args.input_file)
