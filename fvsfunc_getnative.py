@@ -40,8 +40,8 @@ def Resize(src, w, h, sx=None, sy=None, sw=None, sh=None, kernel='spline36', tap
         if kernel == 'lanczos':
             return core.resize.Lanczos(src, w, h, range=fulld, range_in=fulls, filter_param_a=taps,
                                        src_left=sx, src_top=sy, src_width=sw, src_height=sh)
-    return Depth(core.fmtc.resample(src, w, h, sx=sx, sy=sy, sw=sw, sh=sh, kernel=kernel, taps=taps,
-                              a1=a1, a2=a2, a3=a3, invks=invks, invkstaps=invkstaps, fulls=fulls, fulld=fulld), bits)
+    return Depth(core.fmtc.resample(src, w, h, sx=sx, sy=sy, sw=sw, sh=sh, kernel=kernel, taps=taps, a1=a1, a2=a2,
+                                    a3=a3, invks=invks, invkstaps=invkstaps, fulls=fulls, fulld=fulld), bits)
 
 
 def descale_getnative(src, width, height, kernel='bilinear', b=1/3, c=1/3, taps=3, yuv444=False, gray=False, chromaloc=None):
@@ -71,7 +71,7 @@ def descale_getnative(src, width, height, kernel='bilinear', b=1/3, c=1/3, taps=
     uv_f = core.register_format(src_cf, src_st, src_bits, 0 if yuv444 else src_sw, 0 if yuv444 else src_sh)
     uv = src.resize.Spline36(width, height, format=uv_f.id, chromaloc_s=chromaloc)
 
-    return core.std.ShufflePlanes([y,uv], [0,1,2], vs.YUV)
+    return core.std.ShufflePlanes([y, uv], [0, 1, 2], vs.YUV)
 
 
 def to_grays(src):
@@ -83,7 +83,6 @@ def to_rgbs(src):
 
 
 def get_descale_getnative_filter(b, c, taps, kernel):
-    kernel = kernel.lower()
     if kernel == 'bilinear':
         return core.descale_getnative.Debilinear
     elif kernel == 'bicubic':
@@ -94,11 +93,9 @@ def get_descale_getnative_filter(b, c, taps, kernel):
         return core.descale_getnative.Despline16
     elif kernel == 'spline36':
         return core.descale_getnative.Despline36
-    else:
-        raise ValueError('descale_getnative: Invalid kernel specified.')
 
 
-def Depth(src, bits, dither_type='error_diffusion', range=None, range_in=None):
+def Depth(src, bits, dither_type='error_diffusion', range_v=None, range_in=None):
     src_f = src.format
     src_cf = src_f.color_family
     src_bits = src_f.bits_per_sample
@@ -106,16 +103,16 @@ def Depth(src, bits, dither_type='error_diffusion', range=None, range_in=None):
     src_sh = src_f.subsampling_h
     dst_st = vs.INTEGER if bits < 32 else vs.FLOAT
 
-    if isinstance(range, str):
-        range = RANGEDICT[range]
+    if isinstance(range_v, str):
+        range_v = RANGEDICT[range_v]
 
     if isinstance(range_in, str):
         range_in = RANGEDICT[range_in]
 
-    if (src_bits, range_in) == (bits, range):
+    if (src_bits, range_in) == (bits, range_v):
         return src
     out_f = core.register_format(src_cf, dst_st, bits, src_sw, src_sh)
-    return core.resize.Point(src, format=out_f.id, dither_type=dither_type, range=range, range_in=range_in)
+    return core.resize.Point(src, format=out_f.id, dither_type=dither_type, range=range_v, range_in=range_in)
 
 
 RANGEDICT = {'limited': 0, 'full': 1}

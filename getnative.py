@@ -1,4 +1,3 @@
-import os
 import time
 import argparse
 import asyncio
@@ -13,11 +12,6 @@ Reworke by Infi
 Original Author: kageru https://gist.github.com/kageru/549e059335d6efbae709e567ed081799
 Thanks: BluBb_mADe, FichteFoll, stux!, Frechdachs
 """
-
-# general settings
-# target directory (home directory will be prepended, e.g. C:/Users/kageru + targetdir)
-targetdir = os.path.join('Desktop', 'getnative')
-
 
 core = vapoursynth.core
 core.add_cache = False
@@ -42,14 +36,12 @@ class GetNative:
         self.img_out = img_out
         self.txt_output = ""
         self.resolutions = None
-        self.home = self.prepare_savbe_dir()
         self.filename = self.get_filename()
-        self.outname = os.path.join(self.home, targetdir, self.filename)
 
     async def run(self):
 
         if not self.approx and self.kernel not in ['spline36', 'spline16', 'lanczos', 'bicubic', 'bilinear']:
-            return True, f'descale: kernel is not {self.kernel} supported. Try -ap for approximation.'
+            return True, f'descale: {self.kernel} is not a supported kernel. Try -ap for approximation.'
 
         try:
             clip = core.std.BlankClip()
@@ -105,7 +97,7 @@ class GetNative:
         for i, error in enumerate(vals):
             self.txt_output += f'{i + self.min_h:4d}\t\t | {error:.6f}\t\t\t | {ratios[i]:.2f}\n'
 
-        with open(f"{self.outname}.txt", "w") as file_open:
+        with open(f"{self.filename}.txt", "w") as file_open:
             file_open.writelines(self.txt_output)
 
         return False, best_value
@@ -115,6 +107,7 @@ class GetNative:
         w = int(round(w))
         if only_even:
             w = w // 2 * 2
+
         return w
 
     def analyze_results(self, vals):
@@ -153,7 +146,7 @@ class GetNative:
         matplotlib.pyplot.ylabel('Relative error')
         matplotlib.pyplot.xlabel('Resolution')
         matplotlib.pyplot.yscale(self.plot_scaling)
-        matplotlib.pyplot.savefig(f'{self.outname}.' + self.plot_format)
+        matplotlib.pyplot.savefig(f'{self.filename}.' + self.plot_format)
         matplotlib.pyplot.clf()
 
     # Original idea by Chibi_goku http://recensubshq.forumfree.it/?t=64839203
@@ -173,38 +166,30 @@ class GetNative:
     def save_images(self, src_luma32):
         resizer = core.fmtc.resample if self.approx else fvs.Resize
         src = src_luma32
-        temp = imwri.Write(src.fmtc.bitdepth(bits=8), 'png', self.outname + '_source%d.png')
+        temp = imwri.Write(src.fmtc.bitdepth(bits=8), 'png', self.filename + '_source%d.png')
         temp.get_frame(0)  # trick vapoursynth into rendering the frame
         for r in self.resolutions:
             r += self.min_h
             image = self.mask_detail(src, self.getw(r), r)
             # TODO: use PIL for output
-            t = imwri.Write(image.fmtc.bitdepth(bits=8), 'png', self.outname + f'_mask_{r:d}p%d.png')
+            t = imwri.Write(image.fmtc.bitdepth(bits=8), 'png', self.filename + f'_mask_{r:d}p%d.png')
             t.get_frame(0)
             t = resizer(src, self.getw(r), r, kernel=self.kernel, a1=self.b, a2=self.c, invks=True)
-            t = imwri.Write(t.fmtc.bitdepth(bits=8), 'png', self.outname + f'_{r:d}p%d.png')
+            t = imwri.Write(t.fmtc.bitdepth(bits=8), 'png', self.filename + f'_{r:d}p%d.png')
             t.get_frame(0)
 
     def get_filename(self):
         fn = ''.join([
-            f"f_{self.frame}_",
-            f"k_{self.kernel}_",
-            f"b_{self.b:.2f}_c_{self.c:.2f}_" if self.kernel == "bicubic" else "",
-            f"ar_{self.ar:.2f}_" if self.ar else "",
-            f"taps_{self.taps}_" if self.kernel == "lanczos" else "",
-            f"{self.min_h}-{self.max_h}_"
-            f"" if not self.approx else "[approximation]",
+            f"f_{self.frame}",
+            f"_k_{self.kernel}",
+            f"_b_{self.b:.2f}_c_{self.c:.2f}" if self.kernel == "bicubic" else "",
+            f"_ar_{self.ar:.2f}" if self.ar else "",
+            f"_taps_{self.taps}" if self.kernel == "lanczos" else "",
+            f"_{self.min_h}-{self.max_h}",
+            f"" if not self.approx else "_[approximation]",
         ])
 
         return fn
-
-    @staticmethod
-    def prepare_savbe_dir():
-        home = os.path.expanduser('~')
-        savedir = os.path.join(home, targetdir)
-        if not os.path.exists(savedir):
-            os.makedirs(savedir)
-        return home
 
 
 def to_float(str_value):
@@ -238,8 +223,11 @@ def getnative():
     starttime = time.time()
     args = parser.parse_args()
 
+    if not args.approx and not hasattr(core, 'descale_getnative'):
+        return print("Vapoursynth plugin descale_getnative not found.")
+
     if (args.img or args.img_out) and imwri is None:
-        return print("Imwri not found, pls install Imwri")
+        return print("Vapoursynth plugin imwri not found.")
 
     if args.img:
         src = imwri.Read(args.input_file)
