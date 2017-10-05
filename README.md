@@ -42,7 +42,7 @@ Output Graph:
 | -------- | ----------- | ------------------ | ---- |
 | help | Automatically render the usage information when running `-h` or `--help` | true | Boolean |
 |  | Absolute or relative path to the input file | Required | String |
-| frame | Specify a frame for the analysis. Random if unspecified | num_frames//3 | Int |
+| frame | Specify a frame for the analysis. | num_frames//3 | Int |
 | kernel | Resize kernel to be used | bilinear | String |
 | bicubic-b | B parameter of bicubic resize | 1/3 | Float |
 | bicubic-c | C parameter of bicubic resize | 1/3 | Float |
@@ -55,7 +55,7 @@ Output Graph:
 | is-image | Force image input | False | Bool |
 | generate-images | Save detail mask as png | False | Bool |
 | plot-scaling | Scaling of the y axis. Can be "linear" or "log" | log | String |
-| plot-format | Format of the output image. Can be svg, png, pdf, rgba, jp(e)g, tif(f), and probably more | svg | String |
+| plot-format | Format of the output image. Can be svg, png, tif(f), and more | svg | String |
 | show-plot-gui | Show an interactive plot gui window. | False | Bool |
 
 

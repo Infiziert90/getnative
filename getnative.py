@@ -41,20 +41,17 @@ class GetNative:
     async def run(self):
 
         if not self.approx and self.kernel not in ['spline36', 'spline16', 'lanczos', 'bicubic', 'bilinear']:
-            return True, f'descale: {self.kernel} is not a supported kernel. Try -ap for approximation.'
+            raise ValueError(f'descale: {self.kernel} is not a supported kernel. Try -ap for approximation.')
 
         try:
             clip = core.std.BlankClip()
             core.fmtc.resample(clip, kernel=self.kernel)
         except vapoursynth.Error:
-            return True, "fmtc: Invalid kernel specified."
+            raise ValueError('fmtc: Invalid kernel specified.')
 
         src = self.src[self.frame]
-        if self.ar is 0:
-            self.ar = src.width / src.height
-
-        src_luma32 = core.resize.Point(src, format=vapoursynth.YUV444PS, matrix_s='709' if src.format.color_family ==
-                                                                                           vapoursynth.RGB else None)
+        matrix_s = '709' if src.format.color_family == vapoursynth.RGB else None
+        src_luma32 = core.resize.Point(src, format=vapoursynth.YUV444PS, matrix_s=matrix_s)
         src_luma32 = core.std.ShufflePlanes(src_luma32, 0, vapoursynth.GRAY)
         src_luma32 = core.std.Cache(src_luma32)
 
@@ -99,7 +96,7 @@ class GetNative:
         with open(f"{output_dir}/{self.filename}.txt", "w") as file_open:
             file_open.writelines(self.txt_output)
 
-        return False, best_value
+        return best_value
 
     def getw(self, h, only_even=True):
         w = h * self.ar
@@ -304,6 +301,9 @@ def getnative():
     if args.frame is None:
         args.frame = src.num_frames // 3
 
+    if args.ar is 0:
+        args.ar = src.width / src.height
+
     if args.min_h >= src.height:
         raise ValueError(f"Picture is to small or equal for min height {args.min_h}.")
     elif args.min_h >= args.max_h:
@@ -320,23 +320,20 @@ def getnative():
     get_native = GetNative(src, **kwargs)
     try:
         loop = asyncio.get_event_loop()
-        forbidden_error, best_value = loop.run_until_complete(get_native.run())
-    except BaseException as err:
+        best_value = loop.run_until_complete(get_native.run())
+    except ValueError as err:
         return print(f"Error in getnative: {err}")
 
-    if not forbidden_error:
-        content = ''.join([
-            f"\nKernel: {args.kernel} ",
-            f"B: {args.b:.2f} C: {args.c:.2f} " if args.kernel == "bicubic" else "",
-            f"AR: {args.ar} " if args.ar else "",
-            f"Taps: {args.taps} " if args.kernel == "lanczos" else "",
-            f"\n{best_value}",
-            f"" if not args.approx else "\n[approximation]",
-        ])
-        print(content)
-        print('done in {:.2f} s'.format(time.time() - starttime))
-    else:
-        print(best_value)
+    content = ''.join([
+        f"\nKernel: {args.kernel} ",
+        f"B: {args.b:.2f} C: {args.c:.2f} " if args.kernel == "bicubic" else "",
+        f"AR: {args.ar} " if args.ar else "",
+        f"Taps: {args.taps} " if args.kernel == "lanczos" else "",
+        f"\n{best_value}",
+        f"" if not args.approx else "\n[approximation]",
+    ])
+    print(content)
+    print('done in {:.2f} s'.format(time.time() - starttime))
 
 
 if __name__ == '__main__':
