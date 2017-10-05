@@ -2,6 +2,8 @@ import time
 import argparse
 import asyncio
 import vapoursynth
+from functools import partial
+
 import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot
@@ -190,6 +192,41 @@ class GetNative:
         ])
 
         return fn
+
+
+def upscale(src, w, h, kernel, taps, a1, a2):
+    resizer = getattr(src.resize, kernel.title())
+    if not resizer:
+        return src.fmtc.resample(w, h, kernel=kernel, taps=taps, a1=a1, a2=a2)
+    if kernel == 'bicubic':
+        resizer = partial(resizer, filter_param_a=a1, filter_param_b=a2)
+    elif kernel == 'lanczos':
+        resizer = partial(resizer, filter_param_a=taps)
+    return resizer(w, h, kernel)
+
+
+def descale_accurate(video, width, height, kernel, b, c, taps):
+    descale = getattr(video, 'descale_getnative')
+    if not descale:
+        descale = getattr(video, 'descale')
+        if descale:
+            print("Warning: only slow descale available."
+                  "Download modified descale for improved performance"
+                  "https://github.com/bla/bla")
+        else:
+            raise ValueError('no accurate inverse scaler available')
+    descale = getattr(descale, 'De' + kernel)
+    if kernel == 'bicubic':
+        descale = partial(descale, b=b, c=c)
+    elif kernel == 'lanczos':
+        descale = partial(descale, taps=taps)
+    # elif kernel == 'spline':
+    #     kernel = functools.partial(kernel, taps=taps)
+    return descale(width, height)
+
+
+def descale_approx(video, width, height, kernel, b, c, taps):
+    return video.fmtc.resample(width, height, kernel=kernel, taps=taps, a1=b, a2=c, invks=True, invkstaps=taps)
 
 
 def to_float(str_value):
