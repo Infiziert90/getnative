@@ -2,12 +2,10 @@ import time
 import argparse
 import asyncio
 import vapoursynth
-from functools import partial
-
 import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot
-import fvsfunc_getnative as fvs
+from functools import partial
 
 """
 Reworke by Infi
@@ -61,17 +59,14 @@ class GetNative:
         src_luma32 = core.std.Cache(src_luma32)
 
         # descale each individual frame
-        resizer = core.fmtc.resample if self.approx else fvs.Resize
+        resizer = descale_approx if self.approx else descale_accurate
         clip_list = []
         for h in range(self.min_h, self.max_h + 1):
-            clip_list.append(resizer(src_luma32, self.getw(h), h, kernel=self.kernel, a1=self.b, a2=self.c, invks=True,
-                                     taps=self.taps))
+            clip_list.append(resizer(src_luma32, self.getw(h), h, self.kernel, self.b, self.c, self.taps))
         full_clip = core.std.Splice(clip_list, mismatch=True)
-        full_clip = fvs.Resize(full_clip, self.getw(src.height), src.height, kernel=self.kernel, a1=self.b, a2=self.c,
-                               taps=self.taps)
+        full_clip = upscale(full_clip, self.getw(src.height), src.height, self.kernel, self.b, self.c, self.taps)
         if self.ar != src.width / src.height:
-            src_luma32 = resizer(src_luma32, self.getw(src.height), src.height, kernel=self.kernel, a1=self.b, a2=self.c,
-                                 taps=self.taps)
+            src_luma32 = upscale(src_luma32, self.getw(src.height), src.height, self.kernel, self.b, self.c, self.taps)
         full_clip = core.std.Expr([src_luma32 * full_clip.num_frames, full_clip], 'x y - abs dup 0.015 > swap 0 ?')
         full_clip = core.std.CropRel(full_clip, 5, 5, 5, 5)
         full_clip = core.std.PlaneStats(full_clip)
@@ -154,19 +149,18 @@ class GetNative:
     # Original idea by Chibi_goku http://recensubshq.forumfree.it/?t=64839203
     # Vapoursynth port by MonoS @github: https://github.com/MonoS/VS-MaskDetail
     def mask_detail(self, clip, final_width, final_height):
-        resizer = core.fmtc.resample if self.approx else fvs.Resize
-        startclip = core.fmtc.bitdepth(clip, bits=32)
-        original = (startclip.width, startclip.height)
+        resizer = descale_approx if self.approx else descale_accurate
+        original = (clip.width, clip.height)
         target = (final_width, final_height)
-        temp = resizer(startclip, *target[:2], kernel=self.kernel, invks=True, invkstaps=4, taps=self.taps, a1=self.b, a2=self.c)
-        temp = resizer(temp, *original, kernel=self.kernel, taps=self.taps, a1=self.b, a2=self.c)
-        mask = core.std.Expr([startclip, temp], 'x y - abs dup 0.015 > swap 16 * 0 ?').std.Inflate()
-        mask = resizer(mask, *target, taps=self.taps)
+        temp = resizer(clip, *target[:2], self.kernel, self.b, self.c, self.taps)
+        temp = upscale(temp, *original, self.kernel, self.b, self.c, self.taps)
+        mask = core.std.Expr([clip, temp], 'x y - abs dup 0.015 > swap 16 * 0 ?').std.Inflate()
+        mask = upscale(mask, *target, "spline36", self.b, self.c, taps=self.taps)
 
         return core.fmtc.bitdepth(mask, bits=8, dmode=1)
 
     def save_images(self, src_luma32):
-        resizer = core.fmtc.resample if self.approx else fvs.Resize
+        resizer = descale_approx if self.approx else descale_accurate
         src = src_luma32
         temp = imwri.Write(src.fmtc.bitdepth(bits=8), 'png', self.filename + '_source%d.png')
         temp.get_frame(0)  # trick vapoursynth into rendering the frame
@@ -176,7 +170,7 @@ class GetNative:
             # TODO: use PIL for output
             t = imwri.Write(image.fmtc.bitdepth(bits=8), 'png', self.filename + f'_mask_{r:d}p%d.png')
             t.get_frame(0)
-            t = resizer(src, self.getw(r), r, kernel=self.kernel, a1=self.b, a2=self.c, invks=True)
+            t = resizer(src, self.getw(r), r, self.kernel, self.b, self.c, self.taps)
             t = imwri.Write(t.fmtc.bitdepth(bits=8), 'png', self.filename + f'_{r:d}p%d.png')
             t.get_frame(0)
 
@@ -194,27 +188,28 @@ class GetNative:
         return fn
 
 
-def upscale(src, w, h, kernel, taps, a1, a2):
+def upscale(src, width, height, kernel, b, c, taps):
     resizer = getattr(src.resize, kernel.title())
     if not resizer:
-        return src.fmtc.resample(w, h, kernel=kernel, taps=taps, a1=a1, a2=a2)
+        return src.fmtc.resample(width, height, kernel=kernel, a1=b, a2=c, taps=taps)
     if kernel == 'bicubic':
-        resizer = partial(resizer, filter_param_a=a1, filter_param_b=a2)
+        resizer = partial(resizer, filter_param_a=b, filter_param_b=c)
     elif kernel == 'lanczos':
         resizer = partial(resizer, filter_param_a=taps)
-    return resizer(w, h, kernel)
+    return resizer(width, height)
 
 
-def descale_accurate(video, width, height, kernel, b, c, taps):
-    descale = getattr(video, 'descale_getnative')
+def descale_accurate(src, width, height, kernel, b, c, taps):
+    descale = getattr(src, 'descale_getnative')
     if not descale:
-        descale = getattr(video, 'descale')
+        descale = getattr(src, 'descale')
         if descale:
             print("Warning: only slow descale available."
                   "Download modified descale for improved performance"
-                  "https://github.com/bla/bla")
+                  "https://github.com/Infiziert90/vapoursynth-descale")
         else:
-            raise ValueError('no accurate inverse scaler available')
+            raise ValueError('descale_getnative and descale not found, one of them is needed')
+
     descale = getattr(descale, 'De' + kernel)
     if kernel == 'bicubic':
         descale = partial(descale, b=b, c=c)
@@ -225,8 +220,11 @@ def descale_accurate(video, width, height, kernel, b, c, taps):
     return descale(width, height)
 
 
-def descale_approx(video, width, height, kernel, b, c, taps):
-    return video.fmtc.resample(width, height, kernel=kernel, taps=taps, a1=b, a2=c, invks=True, invkstaps=taps)
+def descale_approx(src, width, height, kernel, b, c, taps):
+    descale = getattr(src, 'fmtc')
+    if not descale:
+        raise ValueError('fmtc not found')
+    return src.fmtc.resample(width, height, kernel=kernel, taps=taps, a1=b, a2=c, invks=True, invkstaps=taps)
 
 
 def to_float(str_value):
@@ -236,6 +234,21 @@ def to_float(str_value):
         return eval(str_value) if "/" in str_value else float(str_value)
     except (SyntaxError, ZeroDivisionError, TypeError, ValueError):
         raise argparse.ArgumentTypeError("Exception while parsing float") from None
+
+
+def get_source_filter():
+    source_ffms2 = getattr(core, 'ffms2')
+    if source_ffms2:
+        return source_ffms2
+    source_lsmas = getattr(core, 'lsmas')
+    if source_lsmas:
+        source_lsmas_l = getattr(source_lsmas, 'LWLibavSource')
+        if source_lsmas_l:
+            return source_lsmas
+        source_lsmas_v = getattr(source_lsmas, 'LSMASHVideoSource')
+        if source_lsmas_v:
+            return source_lsmas_v
+    raise ValueError("no source filter found.")
 
 
 parser = argparse.ArgumentParser(description='Find the native resolution(s) of upscaled material (mostly anime)')
@@ -260,27 +273,19 @@ def getnative():
     starttime = time.time()
     args = parser.parse_args()
 
-    if not args.approx and not hasattr(core, 'descale_getnative'):
-        return print("Vapoursynth plugin descale_getnative not found.")
-
     if (args.img or args.img_out) and imwri is None:
-        return print("Vapoursynth plugin imwri not found.")
+        raise ValueError("imwri not found.")
 
-    if args.img:
-        src = imwri.Read(args.input_file)
-        args.frame = 0
-    elif args.ls:
-        src = core.lsmas.LWLibavSource(args.input_file)
-    else:
-        src = core.ffms2.Source(args.input_file)
+    source_filter = get_source_filter()
+    src = source_filter(args.input_file)
 
     if args.frame is None:
         args.frame = src.num_frames // 3
 
     if args.min_h >= src.height:
-        return print(f"Picture is to small or equal for min height {args.min_h}.")
+        raise ValueError(f"Picture is to small or equal for min height {args.min_h}.")
     elif args.min_h >= args.max_h:
-        return print(f"Your min height is bigger or equal to max height.")
+        raise ValueError(f"Your min height is bigger or equal to max height.")
     elif args.max_h > src.height:
         print(f"Your max height cant be bigger than your image dimensions. New max height is {src.height}")
         args.max_h = src.height
