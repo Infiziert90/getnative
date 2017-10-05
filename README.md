@@ -38,24 +38,25 @@ Output Graph:
 
 # Args
 
-| Property | Description | Default&nbsp;value | Type |
+| Property | Description | Default value | Type |
 | -------- | ----------- | ------------------ | ---- |
 | help | Automatically render the usage information when running `-h` or `--help` | true | Boolean |
 |  | Absolute or relative path to the input file | Required | String |
 | frame | Specify a frame for the analysis. Random if unspecified | num_frames//3 | Int |
 | kernel | Resize kernel to be used | bilinear | String |
 | bicubic-b | B parameter of bicubic resize | 1/3 | Float |
-| bicubic-c | C parameter of bicubic resize | 1/3 | Float |
-| lanczos-taps | Taps parameter of lanczos resize | 3 | Int |
-| aspect-ratio | Force aspect ratio. Only useful for anamorphic input| w/h | Float |
+| bicubic-c | C parameter of bicubic resize | 1/3 | Float |
+| lanczos-taps | Taps parameter of lanczos resize | 3 | Int |
+| aspect-ratio | Force aspect ratio. Only useful for anamorphic input| w/h | Float |
 | approx | Use fmtc instead of descale (faster, loss of accuracy) | False | Bool |
-| min-heigth | Minimum height to consider | 500 | Int |
-| max-heigth | Maximum height to consider | 1000 | Int |
-| use-lsmash | Use lsmash for input | False | Bool |
+| min-heigth | Minimum height to consider | 500 | Int |
+| max-heigth | Maximum height to consider | 1000 | Int |
+| use | Use specified source filter (e.g. "lsmas.LWLibavSource") | None | String |
 | is-image | Force image input | False | Bool |
 | generate-images | Save detail mask as png | False | Bool |
 | plot-scaling | Scaling of the y axis. Can be "linear" or "log" | log | String |
 | plot-format | Format of the output image. Can be svg, png, pdf, rgba, jp(e)g, tif(f), and probably more | svg | String |
+| show-plot-gui | Show an interactive plot gui window. | False | Bool |
 
 
 # Warning

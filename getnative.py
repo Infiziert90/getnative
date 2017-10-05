@@ -2,9 +2,7 @@ import time
 import argparse
 import asyncio
 import vapoursynth
-import matplotlib as mpl
-mpl.use('Agg')
-import matplotlib.pyplot
+import os
 from functools import partial
 
 """
@@ -16,11 +14,12 @@ Thanks: BluBb_mADe, FichteFoll, stux!, Frechdachs
 core = vapoursynth.core
 core.add_cache = False
 imwri = getattr(core, "imwri", getattr(core, "imwrif"))
+output_dir = "getnative"
 
 
 class GetNative:
     def __init__(self, src, kernel=None, b=None, c=None, taps=None, ar=None, approx=None, min_h=None, max_h=None,
-                 frame=None, img_out=None, plot_scaling=None, plot_format=None):
+                 frame=None, img_out=None, plot_scaling=None, plot_format=None, show_plot=None):
         self.plot_format = plot_format
         self.plot_scaling = plot_scaling
         self.src = src
@@ -35,6 +34,7 @@ class GetNative:
         self.frame = frame
         self.img_out = img_out
         self.txt_output = ""
+        self.show_plot = show_plot
         self.resolutions = None
         self.filename = self.get_filename()
 
@@ -87,6 +87,8 @@ class GetNative:
         vals += [(futures.pop(task), task.result().props.PlaneStatsAverage) for task in tasks_done]
         vals = [v for _, v in sorted(vals)]
         ratios, vals, best_value = self.analyze_results(vals)
+        if not os.path.isdir(output_dir):
+            os.mkdir(output_dir)
         self.save_plot(vals)
         if self.img_out:
             self.save_images(src_luma32)
@@ -94,7 +96,7 @@ class GetNative:
         for i, error in enumerate(vals):
             self.txt_output += f'{i + self.min_h:4d}\t\t | {error:.6f}\t\t\t | {ratios[i]:.2f}\n'
 
-        with open(f"{self.filename}.txt", "w") as file_open:
+        with open(f"{output_dir}/{self.filename}.txt", "w") as file_open:
             file_open.writelines(self.txt_output)
 
         return False, best_value
@@ -137,13 +139,19 @@ class GetNative:
         return ratios, vals, f"Native resolution(s) (best guess): {best_values}"
 
     def save_plot(self, vals):
+        import matplotlib as mpl
+        if not self.show_plot:
+            mpl.use('Agg')
+        import matplotlib.pyplot
         matplotlib.pyplot.style.use('dark_background')
         matplotlib.pyplot.plot(range(self.min_h, self.max_h + 1), vals, '.w-')
         matplotlib.pyplot.title(self.filename)
         matplotlib.pyplot.ylabel('Relative error')
         matplotlib.pyplot.xlabel('Resolution')
         matplotlib.pyplot.yscale(self.plot_scaling)
-        matplotlib.pyplot.savefig(f'{self.filename}.' + self.plot_format)
+        matplotlib.pyplot.savefig(f'{output_dir}/{self.filename}.' + self.plot_format)
+        if self.show_plot:
+            matplotlib.pyplot.show()
         matplotlib.pyplot.clf()
 
     # Original idea by Chibi_goku http://recensubshq.forumfree.it/?t=64839203
@@ -162,16 +170,16 @@ class GetNative:
     def save_images(self, src_luma32):
         resizer = descale_approx if self.approx else descale_accurate
         src = src_luma32
-        temp = imwri.Write(src.fmtc.bitdepth(bits=8), 'png', self.filename + '_source%d.png')
+        temp = imwri.Write(src.fmtc.bitdepth(bits=8), 'png', f'{output_dir}/{self.filename}_source%d.png')
         temp.get_frame(0)  # trick vapoursynth into rendering the frame
         for r in self.resolutions:
             r += self.min_h
             image = self.mask_detail(src, self.getw(r), r)
             # TODO: use PIL for output
-            t = imwri.Write(image.fmtc.bitdepth(bits=8), 'png', self.filename + f'_mask_{r:d}p%d.png')
+            t = imwri.Write(image.fmtc.bitdepth(bits=8), 'png', f'{output_dir}/{self.filename}_mask_{r:d}p%d.png')
             t.get_frame(0)
             t = resizer(src, self.getw(r), r, self.kernel, self.b, self.c, self.taps)
-            t = imwri.Write(t.fmtc.bitdepth(bits=8), 'png', self.filename + f'_{r:d}p%d.png')
+            t = imwri.Write(t.fmtc.bitdepth(bits=8), 'png', f'{output_dir}/{self.filename}_{r:d}p%d.png')
             t.get_frame(0)
 
     def get_filename(self):
@@ -236,21 +244,6 @@ def to_float(str_value):
         raise argparse.ArgumentTypeError("Exception while parsing float") from None
 
 
-def get_source_filter():
-    source_ffms2 = getattr(core, 'ffms2')
-    if source_ffms2:
-        return source_ffms2
-    source_lsmas = getattr(core, 'lsmas')
-    if source_lsmas:
-        source_lsmas_l = getattr(source_lsmas, 'LWLibavSource')
-        if source_lsmas_l:
-            return source_lsmas
-        source_lsmas_v = getattr(source_lsmas, 'LSMASHVideoSource')
-        if source_lsmas_v:
-            return source_lsmas_v
-    raise ValueError("no source filter found.")
-
-
 parser = argparse.ArgumentParser(description='Find the native resolution(s) of upscaled material (mostly anime)')
 parser.add_argument(dest='input_file', type=str, help='Absolute or relative path to the input file')
 parser.add_argument('--frame', '-f', dest='frame', type=int, default=None, help='Specify a frame for the analysis. Random if unspecified')
@@ -262,11 +255,36 @@ parser.add_argument('--aspect-ratio', '-ar', dest='ar', type=to_float, default=0
 parser.add_argument('--approx', '-ap', dest="approx", action="store_true", help='Use fmtc instead of descale [faster, loss of accuracy]')
 parser.add_argument('--min-heigth', '-min', dest="min_h", type=int, default=500, help='Minimum height to consider')
 parser.add_argument('--max-heigth', '-max', dest="max_h", type=int, default=1000, help='Maximum height to consider')
-parser.add_argument('--use-lsmash', '-ls', dest='ls', action="store_true", help='Use lsmash for input')
+parser.add_argument('--use', '-u', help='Use specified source filter e.g. (lsmas.LWLibavSource)')
 parser.add_argument('--is-image', '-img', dest='img', action="store_true", help='Force image input')
 parser.add_argument('--generate-images', '-img-out', dest='img_out', action="store_true", help='Save detail mask as png')
 parser.add_argument('--plot-scaling', '-ps', dest='plot_scaling', type=str.lower, default='log', help='Scaling of the y axis. Can be "linear" or "log"')
 parser.add_argument('--plot-format', '-pf', dest='plot_format', type=str.lower, default='svg', help='Format of the output image. Can be svg, png, pdf, rgba, jp(e)g, tif(f), and probably more')
+parser.add_argument('--show-plot-gui', '-pg', dest='show_plot', action="store_true", help='Show an interactive plot gui window.')
+
+
+def get_attr(obj, attr, default=None):
+    for ele in attr.split('.'):
+        obj = getattr(obj, ele, default)
+        if obj == default:
+            return default
+    return obj
+
+
+def get_source_filter(args):
+    ext = os.path.splitext(args.input_file)[1].lower()
+    if imwri and (args.img or ext in {"png", "tif", "tiff", "bmp", "jpg", "jpeg", "webp", "tga", "jp2"}):
+        return imwri.Read
+    source_filter = get_attr(core, 'ffms2.Source')
+    if source_filter:
+        return source_filter
+    source_filter = get_attr(core, 'lsmas.LWLibavSource')
+    if source_filter:
+        return source_filter
+    source_filter = get_attr(core, 'lsmas.LSMASHVideoSource')
+    if source_filter:
+        return source_filter
+    raise ValueError("No source filter found.")
 
 
 def getnative():
@@ -276,7 +294,11 @@ def getnative():
     if (args.img or args.img_out) and imwri is None:
         raise ValueError("imwri not found.")
 
-    source_filter = get_source_filter()
+    if args.use:
+        source_filter = get_attr(core, args.use)
+        if not source_filter:
+            raise ValueError(f"{args.use} is not available in the current vapoursynth enviroment.")
+    source_filter = get_source_filter(args)
     src = source_filter(args.input_file)
 
     if args.frame is None:
@@ -292,7 +314,7 @@ def getnative():
 
     kwargs = args.__dict__.copy()
     del kwargs["input_file"]
-    del kwargs["ls"]
+    del kwargs["use"]
     del kwargs["img"]
 
     get_native = GetNative(src, **kwargs)
