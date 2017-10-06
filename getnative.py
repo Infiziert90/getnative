@@ -43,11 +43,11 @@ class GetNative:
         if not self.approx and self.kernel not in ['spline36', 'spline16', 'lanczos', 'bicubic', 'bilinear']:
             raise ValueError(f'descale: {self.kernel} is not a supported kernel. Try -ap for approximation.')
 
-        try:
-            clip = core.std.BlankClip()
-            core.fmtc.resample(clip, kernel=self.kernel)
-        except vapoursynth.Error:
-            raise ValueError('fmtc: Invalid kernel specified.')
+        if self.approx:
+            try:
+                core.fmtc.resample(core.std.BlankClip(), kernel=self.kernel)
+            except vapoursynth.Error:
+                raise ValueError('fmtc: Invalid kernel specified.')
 
         src = self.src[self.frame]
         matrix_s = '709' if src.format.color_family == vapoursynth.RGB else None
@@ -140,6 +140,7 @@ class GetNative:
         if not self.show_plot:
             mpl.use('Agg')
         import matplotlib.pyplot
+
         matplotlib.pyplot.style.use('dark_background')
         matplotlib.pyplot.plot(range(self.min_h, self.max_h + 1), vals, '.w-')
         matplotlib.pyplot.title(self.filename)
@@ -162,21 +163,21 @@ class GetNative:
         mask = core.std.Expr([clip, temp], 'x y - abs dup 0.015 > swap 16 * 0 ?').std.Inflate()
         mask = upscale(mask, *target, "spline36", self.b, self.c, taps=self.taps)
 
-        return core.fmtc.bitdepth(mask, bits=8, dmode=1)
+        return change_bitdepth(mask, bits=8, dither_type="none")
 
     def save_images(self, src_luma32):
         resizer = descale_approx if self.approx else descale_accurate
         src = src_luma32
-        temp = imwri.Write(src.fmtc.bitdepth(bits=8), 'png', f'{output_dir}/{self.filename}_source%d.png')
+        temp = imwri.Write(change_bitdepth(src, bits=8), 'png', f'{output_dir}/{self.filename}_source%d.png')
         temp.get_frame(0)  # trick vapoursynth into rendering the frame
         for r in self.resolutions:
             r += self.min_h
             image = self.mask_detail(src, self.getw(r), r)
             # TODO: use PIL for output
-            t = imwri.Write(image.fmtc.bitdepth(bits=8), 'png', f'{output_dir}/{self.filename}_mask_{r:d}p%d.png')
+            t = imwri.Write(change_bitdepth(image, bits=8), 'png', f'{output_dir}/{self.filename}_mask_{r:d}p%d.png')
             t.get_frame(0)
             t = resizer(src, self.getw(r), r, self.kernel, self.b, self.c, self.taps)
-            t = imwri.Write(t.fmtc.bitdepth(bits=8), 'png', f'{output_dir}/{self.filename}_{r:d}p%d.png')
+            t = imwri.Write(change_bitdepth(t, bits=8), 'png', f'{output_dir}/{self.filename}_{r:d}p%d.png')
             t.get_frame(0)
 
     def get_filename(self):
@@ -201,6 +202,7 @@ def upscale(src, width, height, kernel, b, c, taps):
         resizer = partial(resizer, filter_param_a=b, filter_param_b=c)
     elif kernel == 'lanczos':
         resizer = partial(resizer, filter_param_a=taps)
+
     return resizer(width, height)
 
 
@@ -222,6 +224,7 @@ def descale_accurate(src, width, height, kernel, b, c, taps):
         descale = partial(descale, taps=taps)
     # elif kernel == 'spline':
     #     kernel = functools.partial(kernel, taps=taps)
+
     return descale(width, height)
 
 
@@ -229,7 +232,19 @@ def descale_approx(src, width, height, kernel, b, c, taps):
     descale = getattr(src, 'fmtc')
     if not descale:
         raise ValueError('fmtc not found')
+
     return src.fmtc.resample(width, height, kernel=kernel, taps=taps, a1=b, a2=c, invks=True, invkstaps=taps)
+
+
+def change_bitdepth(src, bits, dither_type='error_diffusion'):
+    src_f = src.format
+    src_cf = src_f.color_family
+    src_sw = src_f.subsampling_w
+    src_sh = src_f.subsampling_h
+    dst_st = vapoursynth.INTEGER if bits < 32 else vapoursynth.FLOAT
+    out_f = core.register_format(src_cf, dst_st, bits, src_sw, src_sh)
+
+    return core.resize.Point(src, format=out_f.id, dither_type=dither_type, range=None, range_in=None)
 
 
 def to_float(str_value):
@@ -270,7 +285,7 @@ def get_attr(obj, attr, default=None):
 
 def get_source_filter(args):
     ext = os.path.splitext(args.input_file)[1].lower()
-    if imwri and (args.img or ext in {"png", "tif", "tiff", "bmp", "jpg", "jpeg", "webp", "tga", "jp2"}):
+    if imwri and (args.img or ext in {".png", ".tif", ".tiff", ".bmp", ".jpg", ".jpeg", ".webp", ".tga", ".jp2"}):
         return imwri.Read
     source_filter = get_attr(core, 'ffms2.Source')
     if source_filter:

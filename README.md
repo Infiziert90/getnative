@@ -45,12 +45,12 @@ Output Graph:
 | frame | Specify a frame for the analysis. | num_frames//3 | Int |
 | kernel | Resize kernel to be used | bilinear | String |
 | bicubic-b | B parameter of bicubic resize | 1/3 | Float |
-| bicubic-c | C parameter of bicubic resize | 1/3 | Float |
-| lanczos-taps | Taps parameter of lanczos resize | 3 | Int |
-| aspect-ratio | Force aspect ratio. Only useful for anamorphic input| w/h | Float |
+| bicubic-c | C parameter of bicubic resize | 1/3 | Float |
+| lanczos-taps | Taps parameter of lanczos resize | 3 | Int |
+| aspect-ratio | Force aspect ratio. Only useful for anamorphic input| w/h | Float |
 | approx | Use fmtc instead of descale (faster, loss of accuracy) | False | Bool |
-| min-heigth | Minimum height to consider | 500 | Int |
-| max-heigth | Maximum height to consider | 1000 | Int |
+| min-heigth | Minimum height to consider | 500 | Int |
+| max-heigth | Maximum height to consider | 1000 | Int |
 | use | Use specified source filter (e.g. "lsmas.LWLibavSource") | None | String |
 | is-image | Force image input | False | Bool |
 | generate-images | Save detail mask as png | False | Bool |
