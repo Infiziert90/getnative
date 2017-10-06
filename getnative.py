@@ -13,7 +13,7 @@ Thanks: BluBb_mADe, FichteFoll, stux!, Frechdachs
 
 core = vapoursynth.core
 core.add_cache = False
-imwri = getattr(core, "imwri", getattr(core, "imwrif"))
+imwri = getattr(core, "imwri", getattr(core, "imwrif", None))
 output_dir = "getnative"
 
 
@@ -207,16 +207,7 @@ def upscale(src, width, height, kernel, b, c, taps):
 
 
 def descale_accurate(src, width, height, kernel, b, c, taps):
-    descale = getattr(src, 'descale_getnative')
-    if not descale:
-        descale = getattr(src, 'descale')
-        if descale:
-            print("Warning: only slow descale available."
-                  "Download modified descale for improved performance"
-                  "https://github.com/Infiziert90/vapoursynth-descale")
-        else:
-            raise ValueError('descale_getnative and descale not found, one of them is needed')
-
+    descale = getattr(src, 'descale_getnative', getattr(src, 'descale'))
     descale = getattr(descale, 'De' + kernel)
     if kernel == 'bicubic':
         descale = partial(descale, b=b, c=c)
@@ -229,8 +220,7 @@ def descale_accurate(src, width, height, kernel, b, c, taps):
 
 
 def descale_approx(src, width, height, kernel, b, c, taps):
-    descale = getattr(src, 'fmtc')
-    if not descale:
+    if not hasattr(src, 'fmtc'):
         raise ValueError('fmtc not found')
 
     return src.fmtc.resample(width, height, kernel=kernel, taps=taps, a1=b, a2=c, invks=True, invkstaps=taps)
@@ -331,6 +321,13 @@ def getnative():
     del kwargs["input_file"]
     del kwargs["use"]
     del kwargs["img"]
+    if not hasattr(src, 'descale_getnative'):
+        if not hasattr(src, 'descale'):
+            raise ValueError('Neither descale_getnative nor descale found.\n'
+                             'One of them is needed for accurate descaling')
+        print("Warning: only the slow descale is available.\n"
+              "Download the modified descale for improved performance:\n"
+              "https://github.com/Infiziert90/vapoursynth-descale")
 
     get_native = GetNative(src, **kwargs)
     try:
