@@ -2,6 +2,7 @@
 Find the native resolution(s) of upscaled material (mostly anime)
 
 # Usage
+Start with installing the depdencies through `pip`.
 
 Start by executing:
 
