@@ -35,7 +35,7 @@ class GetNative:
         self.img_out = img_out
         self.txt_output = ""
         self.show_plot = show_plot
-        self.resolutions = None
+        self.resolutions = []
         self.filename = self.get_filename()
 
     async def run(self):
@@ -108,7 +108,6 @@ class GetNative:
 
     def analyze_results(self, vals):
         ratios = [0.0]
-        resolutions = []
         for i in range(1, len(vals)):
             last = vals[i - 1]
             current = vals[i]
@@ -121,15 +120,14 @@ class GetNative:
         for diff in differences:
             current = ratios.index(diff)
             # don't allow results within 20px of each other
-            for res in resolutions:
+            for res in self.resolutions:
                 if res - 20 < current < res + 20:
                     break
             else:
-                resolutions.append(current)
+                self.resolutions.append(current)
 
-        self.resolutions = resolutions
         bicubic_params = self.kernel == 'bicubic' and f'Scaling parameters:\nb = {self.b:.2f}\nc = {self.c:.2f}\n' or ''
-        best_values = f"{'p, '.join([str(r + self.min_h) for r in resolutions])}p"
+        best_values = f"{'p, '.join([str(r + self.min_h) for r in self.resolutions])}p"
         self.txt_output += f"Resize Kernel: {self.kernel}\n{bicubic_params}Native resolution(s) (best guess): " \
                            f"{best_values}\nPlease check the graph manually for more accurate results\n\n"
 
@@ -156,32 +154,30 @@ class GetNative:
     # Vapoursynth port by MonoS @github: https://github.com/MonoS/VS-MaskDetail
     def mask_detail(self, clip, final_width, final_height):
         resizer = descale_approx if self.approx else descale_accurate
-        original = (clip.width, clip.height)
-        target = (final_width, final_height)
-        temp = resizer(clip, *target[:2], self.kernel, self.b, self.c, self.taps)
-        temp = upscale(temp, *original, self.kernel, self.b, self.c, self.taps)
+        temp = resizer(clip, final_width, final_height, self.kernel, self.b, self.c, self.taps)
+        temp = upscale(temp, clip.width, clip.height, self.kernel, self.b, self.c, self.taps)
         mask = core.std.Expr([clip, temp], 'x y - abs dup 0.015 > swap 16 * 0 ?').std.Inflate()
-        mask = upscale(mask, *target, "spline36", self.b, self.c, taps=self.taps)
+        mask = upscale(mask, final_width, final_height, "spline36", self.b, self.c, taps=self.taps)
 
         return change_bitdepth(mask, bits=8, dither_type="none")
 
+    # TODO: use PIL for output
     def save_images(self, src_luma32):
         resizer = descale_approx if self.approx else descale_accurate
         src = src_luma32
-        temp = imwri.Write(change_bitdepth(src, bits=8), 'png', f'{output_dir}/{self.filename}_source%d.png')
-        temp.get_frame(0)  # trick vapoursynth into rendering the frame
+        first_out = imwri.Write(change_bitdepth(src, bits=8), 'png', f'{output_dir}/{self.filename}_source%d.png')
+        first_out.get_frame(0)  # trick vapoursynth into rendering the frame
         for r in self.resolutions:
             r += self.min_h
             image = self.mask_detail(src, self.getw(r), r)
-            # TODO: use PIL for output
-            t = imwri.Write(change_bitdepth(image, bits=8), 'png', f'{output_dir}/{self.filename}_mask_{r:d}p%d.png')
-            t.get_frame(0)
-            t = resizer(src, self.getw(r), r, self.kernel, self.b, self.c, self.taps)
-            t = imwri.Write(change_bitdepth(t, bits=8), 'png', f'{output_dir}/{self.filename}_{r:d}p%d.png')
-            t.get_frame(0)
+            mask_out = imwri.Write(change_bitdepth(image, bits=8), 'png', f'{output_dir}/{self.filename}_mask_{r:d}p%d.png')
+            mask_out.get_frame(0)
+            descale_out = resizer(src, self.getw(r), r, self.kernel, self.b, self.c, self.taps)
+            descale_out = imwri.Write(change_bitdepth(descale_out, bits=8), 'png', f'{output_dir}/{self.filename}_{r:d}p%d.png')
+            descale_out.get_frame(0)
 
     def get_filename(self):
-        fn = ''.join([
+        return ''.join([
             f"f_{self.frame}",
             f"_k_{self.kernel}",
             f"_b_{self.b:.2f}_c_{self.c:.2f}" if self.kernel == "bicubic" else "",
@@ -190,8 +186,6 @@ class GetNative:
             f"_{self.min_h}-{self.max_h}",
             f"" if not self.approx else "_[approximation]",
         ])
-
-        return fn
 
 
 def upscale(src, width, height, kernel, b, c, taps):
