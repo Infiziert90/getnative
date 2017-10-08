@@ -14,7 +14,7 @@ Thanks: BluBb_mADe, FichteFoll, stux!, Frechdachs
 core = vapoursynth.core
 core.add_cache = False
 imwri = getattr(core, "imwri", getattr(core, "imwrif", None))
-output_dir = "getnative"
+output_dir = os.path.splitext(os.path.basename(__file__))[0]
 
 
 class GetNative:
@@ -64,8 +64,8 @@ class GetNative:
         full_clip = upscale(full_clip, self.getw(src.height), src.height, self.kernel, self.b, self.c, self.taps)
         if self.ar != src.width / src.height:
             src_luma32 = upscale(src_luma32, self.getw(src.height), src.height, self.kernel, self.b, self.c, self.taps)
-        full_clip = core.std.Expr([src_luma32 * full_clip.num_frames, full_clip], 'x y - abs dup 0.015 > swap 0 ?')
-        full_clip = core.std.CropRel(full_clip, 5, 5, 5, 5)
+        expr_full = core.std.Expr([src_luma32 * full_clip.num_frames, full_clip], 'x y - abs dup 0.015 > swap 0 ?')
+        full_clip = core.std.CropRel(expr_full, 5, 5, 5, 5)
         full_clip = core.std.PlaneStats(full_clip)
         full_clip = core.std.Cache(full_clip)
 
@@ -145,7 +145,7 @@ class GetNative:
         matplotlib.pyplot.ylabel('Relative error')
         matplotlib.pyplot.xlabel('Resolution')
         matplotlib.pyplot.yscale(self.plot_scaling)
-        matplotlib.pyplot.savefig(f'{output_dir}/{self.filename}.' + self.plot_format)
+        matplotlib.pyplot.savefig(f'{output_dir}/{self.filename}.{self.plot_format}')
         if self.show_plot:
             matplotlib.pyplot.show()
         matplotlib.pyplot.clf()
@@ -224,13 +224,16 @@ def descale_approx(src, width, height, kernel, b, c, taps):
 
 def change_bitdepth(src, bits, dither_type='error_diffusion'):
     src_f = src.format
-    src_cf = src_f.color_family
-    src_sw = src_f.subsampling_w
-    src_sh = src_f.subsampling_h
-    dst_st = vapoursynth.INTEGER if bits < 32 else vapoursynth.FLOAT
-    out_f = core.register_format(src_cf, dst_st, bits, src_sw, src_sh)
+    out_f = core.register_format(src_f.color_family,
+                                 vapoursynth.INTEGER,
+                                 bits,
+                                 src_f.subsampling_w,
+                                 src_f.subsampling_h)
 
-    return core.resize.Point(src, format=out_f.id, dither_type=dither_type, range=None, range_in=None)
+    return core.resize.Point(src, format=out_f.id, dither_type=dither_type)
+
+    # r39+
+    # return src.resize.Point(format=src.format.replace(bits_per_sample=bits, dither_type=dither_type))
 
 
 def to_float(str_value):
@@ -317,11 +320,11 @@ def getnative():
     del kwargs["input_file"]
     del kwargs["use"]
     del kwargs["img"]
-    if not hasattr(src, 'descale_getnative'):
-        if not hasattr(src, 'descale'):
+    if not hasattr(core, 'descale_getnative'):
+        if not hasattr(core, 'descale'):
             raise ValueError('Neither descale_getnative nor descale found.\n'
                              'One of them is needed for accurate descaling')
-        print("Warning: only the slow descale is available.\n"
+        print("Warning: only the really really slow descale is available.\n"
               "Download the modified descale for improved performance:\n"
               "https://github.com/Infiziert90/vapoursynth-descale")
 
