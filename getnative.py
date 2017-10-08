@@ -201,7 +201,9 @@ def upscale(src, width, height, kernel, b, c, taps):
 
 
 def descale_accurate(src, width, height, kernel, b, c, taps):
-    descale = getattr(src, 'descale_getnative', getattr(src, 'descale'))
+    descale = getattr(src, 'descale_getnative', None)
+    if descale is None:
+        descale = getattr(src, 'descale')
     descale = getattr(descale, 'De' + kernel)
     if kernel == 'bicubic':
         descale = partial(descale, b=b, c=c)
@@ -333,7 +335,7 @@ def getnative():
     content = ''.join([
         f"\nKernel: {args.kernel} ",
         f"B: {args.b:.2f} C: {args.c:.2f} " if args.kernel == "bicubic" else "",
-        f"AR: {args.ar} " if args.ar else "",
+        f"AR: {args.ar:.2f} " if args.ar else "",
         f"Taps: {args.taps} " if args.kernel == "lanczos" else "",
         f"\n{best_value}",
         f"" if not args.approx else "\n[approximation]",
