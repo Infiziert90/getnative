@@ -39,16 +39,7 @@ class GetNative:
         self.filename = self.get_filename()
 
     async def run(self):
-
-        if not self.approx and self.kernel not in ['spline36', 'spline16', 'lanczos', 'bicubic', 'bilinear']:
-            raise ValueError(f'descale: {self.kernel} is not a supported kernel. Try -ap for approximation.')
-
-        if self.approx:
-            try:
-                core.fmtc.resample(core.std.BlankClip(), kernel=self.kernel)
-            except vapoursynth.Error:
-                raise ValueError('fmtc: Invalid kernel specified.')
-
+        # change format to GrayS with bitdepth 32 for descale
         src = self.src[self.frame]
         matrix_s = '709' if src.format.color_family == vapoursynth.RGB else None
         src_luma32 = core.resize.Point(src, format=vapoursynth.YUV444PS, matrix_s=matrix_s)
@@ -86,12 +77,14 @@ class GetNative:
         ratios, vals, best_value = self.analyze_results(vals)
         if not os.path.isdir(output_dir):
             os.mkdir(output_dir)
+
         self.save_plot(vals)
         if self.img_out:
             self.save_images(src_luma32)
+
         self.txt_output += 'Raw data:\nResolution\t | Relative Error\t | Relative difference from last\n'
         for i, error in enumerate(vals):
-            self.txt_output += f'{i + self.min_h:4d}\t\t | {error:.6f}\t\t\t | {ratios[i]:.2f}\n'
+            self.txt_output += f'{i + self.min_h:4d}\t\t | {error:.10f}\t\t\t | {ratios[i]:.2f}\n'
 
         with open(f"{output_dir}/{self.filename}.txt", "w") as file_open:
             file_open.writelines(self.txt_output)
@@ -159,32 +152,32 @@ class GetNative:
         mask = core.std.Expr([clip, temp], 'x y - abs dup 0.015 > swap 16 * 0 ?').std.Inflate()
         mask = upscale(mask, final_width, final_height, "spline36", self.b, self.c, taps=self.taps)
 
-        return change_bitdepth(mask, bits=8, dither_type="none")
+        return change_bitdepth(mask, dither_type="none")
 
     # TODO: use PIL for output
     def save_images(self, src_luma32):
         resizer = descale_approx if self.approx else descale_accurate
         src = src_luma32
-        first_out = imwri.Write(change_bitdepth(src, bits=8), 'png', f'{output_dir}/{self.filename}_source%d.png')
+        first_out = imwri.Write(change_bitdepth(src), 'png', f'{output_dir}/{self.filename}_source%d.png')
         first_out.get_frame(0)  # trick vapoursynth into rendering the frame
         for r in self.resolutions:
             r += self.min_h
             image = self.mask_detail(src, self.getw(r), r)
-            mask_out = imwri.Write(change_bitdepth(image, bits=8), 'png', f'{output_dir}/{self.filename}_mask_{r:d}p%d.png')
+            mask_out = imwri.Write(change_bitdepth(image), 'png', f'{output_dir}/{self.filename}_mask_{r:d}p%d.png')
             mask_out.get_frame(0)
             descale_out = resizer(src, self.getw(r), r, self.kernel, self.b, self.c, self.taps)
-            descale_out = imwri.Write(change_bitdepth(descale_out, bits=8), 'png', f'{output_dir}/{self.filename}_{r:d}p%d.png')
+            descale_out = imwri.Write(change_bitdepth(descale_out), 'png', f'{output_dir}/{self.filename}_{r:d}p%d.png')
             descale_out.get_frame(0)
 
     def get_filename(self):
         return ''.join([
             f"f_{self.frame}",
             f"_k_{self.kernel}",
-            f"_b_{self.b:.2f}_c_{self.c:.2f}" if self.kernel == "bicubic" else "",
-            f"_ar_{self.ar:.2f}" if self.ar else "",
-            f"_taps_{self.taps}" if self.kernel == "lanczos" else "",
+            f"_ar_{self.ar:.2f}",
             f"_{self.min_h}-{self.max_h}",
-            f"" if not self.approx else "_[approximation]",
+            f"_b_{self.b:.2f}_c_{self.c:.2f}" if self.kernel == "bicubic" else "",
+            f"_taps_{self.taps}" if self.kernel == "lanczos" else "",
+            f"_[approximation]" if self.approx else "",
         ])
 
 
@@ -209,20 +202,15 @@ def descale_accurate(src, width, height, kernel, b, c, taps):
         descale = partial(descale, b=b, c=c)
     elif kernel == 'lanczos':
         descale = partial(descale, taps=taps)
-    # elif kernel == 'spline':
-    #     kernel = functools.partial(kernel, taps=taps)
 
     return descale(width, height)
 
 
 def descale_approx(src, width, height, kernel, b, c, taps):
-    if not hasattr(src, 'fmtc'):
-        raise ValueError('fmtc not found')
-
     return src.fmtc.resample(width, height, kernel=kernel, taps=taps, a1=b, a2=c, invks=True, invkstaps=taps)
 
 
-def change_bitdepth(src, bits, dither_type='error_diffusion'):
+def change_bitdepth(src, bits=8, dither_type='error_diffusion'):
     src_f = src.format
     out_f = core.register_format(src_f.color_family,
                                  vapoursynth.INTEGER,
@@ -243,25 +231,6 @@ def to_float(str_value):
         return eval(str_value) if "/" in str_value else float(str_value)
     except (SyntaxError, ZeroDivisionError, TypeError, ValueError):
         raise argparse.ArgumentTypeError("Exception while parsing float") from None
-
-
-parser = argparse.ArgumentParser(description='Find the native resolution(s) of upscaled material (mostly anime)')
-parser.add_argument(dest='input_file', type=str, help='Absolute or relative path to the input file')
-parser.add_argument('--frame', '-f', dest='frame', type=int, default=None, help='Specify a frame for the analysis. Random if unspecified')
-parser.add_argument('--kernel', '-k', dest='kernel', type=str.lower, default='bilinear', help='Resize kernel to be used')
-parser.add_argument('--bicubic-b', '-b', dest='b', type=to_float, default="1/3", help='B parameter of bicubic resize')
-parser.add_argument('--bicubic-c', '-c', dest='c', type=to_float, default="1/3", help='C parameter of bicubic resize')
-parser.add_argument('--lanczos-taps', '-t', dest='taps', type=int, default=3, help='Taps parameter of lanczos resize')
-parser.add_argument('--aspect-ratio', '-ar', dest='ar', type=to_float, default=0, help='Force aspect ratio. Only useful for anamorphic input')
-parser.add_argument('--approx', '-ap', dest="approx", action="store_true", help='Use fmtc instead of descale [faster, loss of accuracy]')
-parser.add_argument('--min-heigth', '-min', dest="min_h", type=int, default=500, help='Minimum height to consider')
-parser.add_argument('--max-heigth', '-max', dest="max_h", type=int, default=1000, help='Maximum height to consider')
-parser.add_argument('--use', '-u', help='Use specified source filter e.g. (lsmas.LWLibavSource)')
-parser.add_argument('--is-image', '-img', dest='img', action="store_true", help='Force image input')
-parser.add_argument('--generate-images', '-img-out', dest='img_out', action="store_true", help='Save detail mask as png')
-parser.add_argument('--plot-scaling', '-ps', dest='plot_scaling', type=str.lower, default='log', help='Scaling of the y axis. Can be "linear" or "log"')
-parser.add_argument('--plot-format', '-pf', dest='plot_format', type=str.lower, default='svg', help='Format of the output image. Can be svg, png, pdf, rgba, jp(e)g, tif(f), and probably more')
-parser.add_argument('--show-plot-gui', '-pg', dest='show_plot', action="store_true", help='Show an interactive plot gui window.')
 
 
 def get_attr(obj, attr, default=None):
@@ -288,6 +257,25 @@ def get_source_filter(args):
     raise ValueError("No source filter found.")
 
 
+parser = argparse.ArgumentParser(description='Find the native resolution(s) of upscaled material (mostly anime)')
+parser.add_argument(dest='input_file', type=str, help='Absolute or relative path to the input file')
+parser.add_argument('--frame', '-f', dest='frame', type=int, default=None, help='Specify a frame for the analysis. Random if unspecified')
+parser.add_argument('--kernel', '-k', dest='kernel', type=str.lower, default='bilinear', help='Resize kernel to be used')
+parser.add_argument('--bicubic-b', '-b', dest='b', type=to_float, default="1/3", help='B parameter of bicubic resize')
+parser.add_argument('--bicubic-c', '-c', dest='c', type=to_float, default="1/3", help='C parameter of bicubic resize')
+parser.add_argument('--lanczos-taps', '-t', dest='taps', type=int, default=3, help='Taps parameter of lanczos resize')
+parser.add_argument('--aspect-ratio', '-ar', dest='ar', type=to_float, default=0, help='Force aspect ratio. Only useful for anamorphic input')
+parser.add_argument('--approx', '-ap', dest="approx", action="store_true", help='Use fmtc instead of descale [faster, loss of accuracy]')
+parser.add_argument('--min-heigth', '-min', dest="min_h", type=int, default=500, help='Minimum height to consider')
+parser.add_argument('--max-heigth', '-max', dest="max_h", type=int, default=1000, help='Maximum height to consider')
+parser.add_argument('--use', '-u', help='Use specified source filter e.g. (lsmas.LWLibavSource)')
+parser.add_argument('--is-image', '-img', dest='img', action="store_true", help='Force image input')
+parser.add_argument('--generate-images', '-img-out', dest='img_out', action="store_true", help='Save detail mask as png')
+parser.add_argument('--plot-scaling', '-ps', dest='plot_scaling', type=str.lower, default='log', help='Scaling of the y axis. Can be "linear" or "log"')
+parser.add_argument('--plot-format', '-pf', dest='plot_format', type=str.lower, default='svg', help='Format of the output image. Can be svg, png, pdf, rgba, jp(e)g, tif(f), and probably more')
+parser.add_argument('--show-plot-gui', '-pg', dest='show_plot', action="store_true", help='Show an interactive plot gui window.')
+
+
 def getnative():
     starttime = time.time()
     args = parser.parse_args()
@@ -295,13 +283,34 @@ def getnative():
     if (args.img or args.img_out) and imwri is None:
         raise ValueError("imwri not found.")
 
+    if args.approx:
+        if not hasattr(core, 'fmtc'):
+            raise ValueError('fmtc not found')
+
+        try:
+            core.fmtc.resample(core.std.BlankClip(), kernel=args.kernel)
+        except vapoursynth.Error:
+            raise ValueError('fmtc: Invalid kernel specified.')
+    else:
+        if not hasattr(core, 'descale_getnative'):
+            if not hasattr(core, 'descale'):
+                raise ValueError('Neither descale_getnative nor descale found.\n'
+                                 'One of them is needed for accurate descaling')
+            print("Warning: only the really really slow descale is available.\n"
+                  "Download the modified descale for improved performance:\n"
+                  "https://github.com/Infiziert90/vapoursynth-descale")
+
+        if args.kernel not in ['spline36', 'spline16', 'lanczos', 'bicubic', 'bilinear']:
+            raise ValueError(f'descale: {args.kernel} is not a supported kernel. Try -ap for approximation.')
+
     if args.use:
         source_filter = get_attr(core, args.use)
         if not source_filter:
             raise ValueError(f"{args.use} is not available in the current vapoursynth enviroment.")
-    source_filter = get_source_filter(args)
-    src = source_filter(args.input_file)
+    else:
+        source_filter = get_source_filter(args)
 
+    src = source_filter(args.input_file)
     if args.frame is None:
         args.frame = src.num_frames // 3
 
@@ -320,13 +329,6 @@ def getnative():
     del kwargs["input_file"]
     del kwargs["use"]
     del kwargs["img"]
-    if not hasattr(core, 'descale_getnative'):
-        if not hasattr(core, 'descale'):
-            raise ValueError('Neither descale_getnative nor descale found.\n'
-                             'One of them is needed for accurate descaling')
-        print("Warning: only the really really slow descale is available.\n"
-              "Download the modified descale for improved performance:\n"
-              "https://github.com/Infiziert90/vapoursynth-descale")
 
     get_native = GetNative(src, **kwargs)
     try:
@@ -337,11 +339,11 @@ def getnative():
 
     content = ''.join([
         f"\nKernel: {args.kernel} ",
+        f"AR: {args.ar:.2f} ",
         f"B: {args.b:.2f} C: {args.c:.2f} " if args.kernel == "bicubic" else "",
-        f"AR: {args.ar:.2f} " if args.ar else "",
         f"Taps: {args.taps} " if args.kernel == "lanczos" else "",
         f"\n{best_value}",
-        f"" if not args.approx else "\n[approximation]",
+        f"\n[approximation]" if args.approx else "",
     ])
     print(content)
     print('done in {:.2f} s'.format(time.time() - starttime))
