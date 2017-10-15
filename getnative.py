@@ -63,7 +63,9 @@ class GetNative:
         tasks_pending = set()
         futures = {}
         vals = []
+        full_clip_len = len(full_clip)
         for frame_index in range(len(full_clip)):
+            print(f"{frame_index}/{full_clip_len}", end="\r")
             fut = asyncio.ensure_future(asyncio.wrap_future(full_clip.get_frame_async(frame_index)))
             tasks_pending.add(fut)
             futures[fut] = frame_index
@@ -181,6 +183,7 @@ class GetNative:
         ])
 
 
+# TODO Check fmtc kernel befor calling fmtc here
 def upscale(src, width, height, kernel, b, c, taps):
     resizer = getattr(src.resize, kernel.title())
     if not resizer:
@@ -244,15 +247,19 @@ def get_attr(obj, attr, default=None):
 def get_source_filter(args):
     ext = os.path.splitext(args.input_file)[1].lower()
     if imwri and (args.img or ext in {".png", ".tif", ".tiff", ".bmp", ".jpg", ".jpeg", ".webp", ".tga", ".jp2"}):
+        print("Using imwri as source filter")
         return imwri.Read
     source_filter = get_attr(core, 'ffms2.Source')
     if source_filter:
+        print("Using ffms2 as source filter")
         return source_filter
     source_filter = get_attr(core, 'lsmas.LWLibavSource')
     if source_filter:
+        print("Using lsmas.LWLibavSource as source filter")
         return source_filter
     source_filter = get_attr(core, 'lsmas.LSMASHVideoSource')
     if source_filter:
+        print("Using lsmas.LSMASHVideoSource as source filter")
         return source_filter
     raise ValueError("No source filter found.")
 
@@ -307,6 +314,7 @@ def getnative():
         source_filter = get_attr(core, args.use)
         if not source_filter:
             raise ValueError(f"{args.use} is not available in the current vapoursynth enviroment.")
+        print(f"Using {args.use} as source filter")
     else:
         source_filter = get_source_filter(args)
 
