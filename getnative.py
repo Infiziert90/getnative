@@ -299,13 +299,12 @@ def getnative():
         except vapoursynth.Error:
             raise ValueError('fmtc: Invalid kernel specified.')
     else:
-        if not hasattr(core, 'descale_getnative'):
+        if "toggaf.asi.xe" not in core.get_plugins():
             if not hasattr(core, 'descale'):
-                raise ValueError('Neither descale_getnative nor descale found.\n'
-                                 'One of them is needed for accurate descaling')
+                raise ValueError('No descale found.\nIt is needed for accurate descaling')
             print("Warning: only the really really slow descale is available.\n"
                   "Download the modified descale for improved performance:\n"
-                  "https://github.com/Infiziert90/vapoursynth-descale")
+                  "https://github.com/BluBb-mADe/vapoursynth-descale")
 
         if args.kernel not in ['spline36', 'spline16', 'lanczos', 'bicubic', 'bilinear']:
             raise ValueError(f'descale: {args.kernel} is not a supported kernel. Try -ap for approximation.')
