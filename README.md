@@ -17,7 +17,7 @@ To run this script you will need:
 * Python 3.6
 * [matplotlib](http://matplotlib.org/users/installing.html)
 * [Vapoursynth](http://www.vapoursynth.com)
-* [descale](https://github.com/Irrational-Encoding-Wizardry/vapoursynth-descale) or [fmtconv](https://github.com/EleonoreMizo/fmtconv)
+* [descale](https://github.com/Irrational-Encoding-Wizardry/vapoursynth-descale) or [descale_getnative](https://github.com/BluBb-mADe/vapoursynth-descale)
 * [ffms2](https://github.com/FFMS/ffms2) or [lsmash](https://github.com/VFR-maniac/L-SMASH-Works) or [imwri](https://forum.doom9.org/showthread.php?t=170981)
 
 # Example Output
@@ -44,12 +44,12 @@ Output Graph:
 | help | Automatically render the usage information when running `-h` or `--help` | true | Boolean |
 |  | Absolute or relative path to the input file | Required | String |
 | frame | Specify a frame for the analysis. | num_frames//3 | Int |
+| scaler | Use a predefined scaler. | Bicubic (b=1/3, c=1/3) | String |
 | kernel | Resize kernel to be used | bilinear | String |
 | bicubic-b | B parameter of bicubic resize | 1/3 | Float |
 | bicubic-c | C parameter of bicubic resize | 1/3 | Float |
 | lanczos-taps | Taps parameter of lanczos resize | 3 | Int |
 | aspect-ratio | Force aspect ratio. Only useful for anamorphic input| w/h | Float |
-| approx | Use fmtc instead of descale (faster, loss of accuracy) | False | Bool |
 | min-heigth | Minimum height to consider | 500 | Int |
 | max-heigth | Maximum height to consider | 1000 | Int |
 | use | Use specified source filter (e.g. "lsmas.LWLibavSource") | None | String |
@@ -58,6 +58,11 @@ Output Graph:
 | plot-scaling | Scaling of the y axis. Can be "linear" or "log" | log | String |
 | plot-format | Format of the output image. Can be svg, png, tif(f), and more | svg | String |
 | show-plot-gui | Show an interactive plot gui window. | False | Bool |
+| bilinear | Run all predefined bilinear scalers. | False | Bool |
+| bicubic | Run all predefined bicubic scalers. | False | Bool |
+| bc-bl | Run all predefined bicubic and bilinear scalers. | False | Bool |
+| run-all | Run all scalers. | False | Bool |
+| no-save | Do not save files to disk. | False | Bool |
 
 
 # Warning

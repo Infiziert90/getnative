@@ -1,40 +1,115 @@
+import gc
 import time
 import argparse
 import asyncio
 import vapoursynth
 import os
 from functools import partial
+from typing import Union, List, Tuple
+try:
+    import matplotlib as mpl
+    import matplotlib.pyplot as pyplot
+except BaseException:
+    import matplotlib as mpl
+    mpl.use('Agg')
+    import matplotlib.pyplot as pyplot
 
 """
-Reworke by Infi
+Rework by Infi
 Original Author: kageru https://gist.github.com/kageru/549e059335d6efbae709e567ed081799
 Thanks: BluBb_mADe, FichteFoll, stux!, Frechdachs
 """
 
 core = vapoursynth.core
 core.add_cache = False
+core.accept_lowercase = True
 imwri = getattr(core, "imwri", getattr(core, "imwrif", None))
 output_dir = os.path.splitext(os.path.basename(__file__))[0]
 
 
+class GetnativeException(BaseException):
+    pass
+
+
+class DefineScaler:
+    def __init__(self, kernel: str, b: Union[float, int]=0, c: Union[float, int]=0, taps: Union[float, int]=0):
+        """
+        Get a scaler for getnative from descale
+
+        :param kernel: kernel for descale
+        :param b: b value for kernel "bicubic" (default 0)
+        :param c: c value for kernel "bicubic" (default 0)
+        :param taps: taps value for kernel "lanczos" (default 0)
+        """
+        self.kernel = kernel
+        self.b = b
+        self.c = c
+        self.taps = taps
+        self.check_input()
+        self.descaler = self.get_descaler()
+        self.upscaler = self.get_upscaler()
+
+    def get_descaler(self):
+        descaler = getattr(core, 'descale_getnative', None)
+        if descaler is None:
+            descaler = getattr(core, 'descale')
+        descaler = getattr(descaler, 'De' + self.kernel)
+        if self.kernel == 'bicubic':
+            descaler = partial(descaler, b=self.b, c=self.c)
+        elif self.kernel == 'lanczos':
+            descaler = partial(descaler, taps=self.taps)
+
+        return descaler
+
+    def get_upscaler(self):
+        upscaler = getattr(core.resize, self.kernel.title())
+        if self.kernel == 'bicubic':
+            upscaler = partial(upscaler, filter_param_a=self.b, filter_param_b=self.c)
+        elif self.kernel == 'lanczos':
+            upscaler = partial(upscaler, filter_param_a=self.taps)
+
+        return upscaler
+
+    def check_input(self):
+        if "toggaf.asi.xe" not in core.get_plugins():
+            if not hasattr(core, 'descale'):
+                raise GetnativeException('No descale found.\nIt is needed for accurate descaling')
+            print("Warning: only the really really slow descale is available. (See README for help)\n")
+
+        if self.kernel not in ['spline36', 'spline16', 'lanczos', 'bicubic', 'bilinear']:
+            raise GetnativeException(f'descale: {self.kernel} is not a supported kernel.')
+
+
+scaler_dict = {
+    "Bilinear": DefineScaler("bilinear"),
+    "Bicubic (b=1/3, c=1/3)": DefineScaler("bicubic", b=1/3, c=1/3),
+    "Bicubic (b=0.5, c=0)": DefineScaler("bicubic", b=.5, c=0),
+    "Bicubic (b=0, c=0.5)": DefineScaler("bicubic", b=0, c=.5),
+    "Bicubic (b=1, c=0)": DefineScaler("bicubic", b=1, c=0),
+    "Bicubic (b=0, c=1)": DefineScaler("bicubic", b=0, c=1),
+    "Bicubic (b=0.2, c=0.5)": DefineScaler("bicubic", b=.2, c=.5),
+    "Lanczos (3 Taps)": DefineScaler("lanczos", taps=3),
+    "Lanczos (4 Taps)": DefineScaler("lanczos", taps=4),
+    "Lanczos (5 Taps)": DefineScaler("lanczos", taps=5),
+    "Spline16": DefineScaler("spline16"),
+    "Spline36": DefineScaler("spline36"),
+    }
+
+
 class GetNative:
-    def __init__(self, src, kernel=None, b=None, c=None, taps=None, ar=None, approx=None, min_h=None, max_h=None,
-                 frame=None, img_out=None, plot_scaling=None, plot_format=None, show_plot=None):
+    def __init__(self, src, scaler, ar, min_h, max_h, frame, img_out, plot_scaling, plot_format, show_plot, no_save):
         self.plot_format = plot_format
         self.plot_scaling = plot_scaling
         self.src = src
         self.min_h = min_h
         self.max_h = max_h
         self.ar = ar
-        self.b = b
-        self.c = c
-        self.taps = taps
-        self.approx = approx
-        self.kernel = kernel
+        self.scaler = scaler
         self.frame = frame
         self.img_out = img_out
-        self.txt_output = ""
         self.show_plot = show_plot
+        self.no_save = no_save
+        self.txt_output = ""
         self.resolutions = []
         self.filename = self.get_filename()
 
@@ -47,14 +122,15 @@ class GetNative:
         src_luma32 = core.std.Cache(src_luma32)
 
         # descale each individual frame
-        resizer = descale_approx if self.approx else descale_accurate
+        resizer = self.scaler.descaler
+        upscaler = self.scaler.upscaler
         clip_list = []
         for h in range(self.min_h, self.max_h + 1):
-            clip_list.append(resizer(src_luma32, self.getw(h), h, self.kernel, self.b, self.c, self.taps))
+            clip_list.append(resizer(src_luma32, self.getw(h), h))
         full_clip = core.std.Splice(clip_list, mismatch=True)
-        full_clip = upscale(full_clip, self.getw(src.height), src.height, self.kernel, self.b, self.c, self.taps)
+        full_clip = upscaler(full_clip, self.getw(src.height), src.height)
         if self.ar != src.width / src.height:
-            src_luma32 = upscale(src_luma32, self.getw(src.height), src.height, self.kernel, self.b, self.c, self.taps)
+            src_luma32 = upscaler(src_luma32, self.getw(src.height), src.height)
         expr_full = core.std.Expr([src_luma32 * full_clip.num_frames, full_clip], 'x y - abs dup 0.015 > swap 0 ?')
         full_clip = core.std.CropRel(expr_full, 5, 5, 5, 5)
         full_clip = core.std.PlaneStats(full_clip)
@@ -69,7 +145,7 @@ class GetNative:
             fut = asyncio.ensure_future(asyncio.wrap_future(full_clip.get_frame_async(frame_index)))
             tasks_pending.add(fut)
             futures[fut] = frame_index
-            while len(tasks_pending) >= core.num_threads * (2 if self.approx else 1) + 2:
+            while len(tasks_pending) >= core.num_threads + 2:
                 tasks_done, tasks_pending = await asyncio.wait(tasks_pending, return_when=asyncio.FIRST_COMPLETED)
                 vals += [(futures.pop(task), task.result().props.PlaneStatsAverage) for task in tasks_done]
 
@@ -80,18 +156,19 @@ class GetNative:
         if not os.path.isdir(output_dir):
             os.mkdir(output_dir)
 
-        self.save_plot(vals)
-        if self.img_out:
+        plot = self.save_plot(vals)
+        if not self.no_save and self.img_out:
             self.save_images(src_luma32)
 
         self.txt_output += 'Raw data:\nResolution\t | Relative Error\t | Relative difference from last\n'
         for i, error in enumerate(vals):
             self.txt_output += f'{i + self.min_h:4d}\t\t | {error:.10f}\t\t\t | {ratios[i]:.2f}\n'
 
-        with open(f"{output_dir}/{self.filename}.txt", "w") as file_open:
-            file_open.writelines(self.txt_output)
+        if not self.no_save:
+            with open(f"{output_dir}/{self.filename}.txt", "w") as stream:
+                stream.writelines(self.txt_output)
 
-        return best_value
+        return best_value, plot, self.resolutions
 
     def getw(self, h, only_even=True):
         w = h * self.ar
@@ -121,113 +198,177 @@ class GetNative:
             else:
                 self.resolutions.append(current)
 
-        bicubic_params = self.kernel == 'bicubic' and f'Scaling parameters:\nb = {self.b:.2f}\nc = {self.c:.2f}\n' or ''
+        scaler = self.scaler
+        bicubic_params = scaler.kernel == 'bicubic' and f'Scaling parameters:\nb = {scaler.b:.2f}\nc = {scaler.c:.2f}\n' or ''
         best_values = f"{'p, '.join([str(r + self.min_h) for r in self.resolutions])}p"
-        self.txt_output += f"Resize Kernel: {self.kernel}\n{bicubic_params}Native resolution(s) (best guess): " \
+        self.txt_output += f"Resize Kernel: {scaler.kernel}\n{bicubic_params}Native resolution(s) (best guess): " \
                            f"{best_values}\nPlease check the graph manually for more accurate results\n\n"
 
         return ratios, vals, f"Native resolution(s) (best guess): {best_values}"
 
     def save_plot(self, vals):
-        import matplotlib as mpl
-        if not self.show_plot:
-            mpl.use('Agg')
-        import matplotlib.pyplot
-
-        matplotlib.pyplot.style.use('dark_background')
-        matplotlib.pyplot.plot(range(self.min_h, self.max_h + 1), vals, '.w-')
-        matplotlib.pyplot.title(self.filename)
-        matplotlib.pyplot.ylabel('Relative error')
-        matplotlib.pyplot.xlabel('Resolution')
-        matplotlib.pyplot.yscale(self.plot_scaling)
-        matplotlib.pyplot.savefig(f'{output_dir}/{self.filename}.{self.plot_format}')
+        plot = pyplot
+        plot.style.use('dark_background')
+        plot.plot(range(self.min_h, self.max_h + 1), vals, '.w-')
+        plot.title(self.filename)
+        plot.ylabel('Relative error')
+        plot.xlabel('Resolution')
+        plot.yscale(self.plot_scaling)
+        if not self.no_save:
+            plot.savefig(f'{output_dir}/{self.filename}.{self.plot_format}')
         if self.show_plot:
-            matplotlib.pyplot.show()
-        matplotlib.pyplot.clf()
+            plot.show()
+
+        return plot
 
     # Original idea by Chibi_goku http://recensubshq.forumfree.it/?t=64839203
     # Vapoursynth port by MonoS @github: https://github.com/MonoS/VS-MaskDetail
     def mask_detail(self, clip, final_width, final_height):
-        resizer = descale_approx if self.approx else descale_accurate
-        temp = resizer(clip, final_width, final_height, self.kernel, self.b, self.c, self.taps)
-        temp = upscale(temp, clip.width, clip.height, self.kernel, self.b, self.c, self.taps)
+        temp = self.scaler.descaler(clip, final_width, final_height)
+        temp = self.scaler.upscaler(temp, clip.width, clip.height)
         mask = core.std.Expr([clip, temp], 'x y - abs dup 0.015 > swap 16 * 0 ?').std.Inflate()
-        mask = upscale(mask, final_width, final_height, "spline36", self.b, self.c, taps=self.taps)
+        mask = scaler_dict["Spline36"].upscaler(mask, final_width, final_height)
 
-        return change_bitdepth(mask, dither_type="none")
+        return self.change_bitdepth(mask, dither_type="none")
 
     # TODO: use PIL for output
     def save_images(self, src_luma32):
-        resizer = descale_approx if self.approx else descale_accurate
         src = src_luma32
-        first_out = imwri.Write(change_bitdepth(src), 'png', f'{output_dir}/{self.filename}_source%d.png')
+        first_out = imwri.Write(self.change_bitdepth(src), 'png', f'{output_dir}/{self.filename}_source%d.png')
         first_out.get_frame(0)  # trick vapoursynth into rendering the frame
         for r in self.resolutions:
             r += self.min_h
             image = self.mask_detail(src, self.getw(r), r)
-            mask_out = imwri.Write(change_bitdepth(image), 'png', f'{output_dir}/{self.filename}_mask_{r:d}p%d.png')
+            mask_out = imwri.Write(self.change_bitdepth(image), 'png', f'{output_dir}/{self.filename}_mask_{r:d}p%d.png')
             mask_out.get_frame(0)
-            descale_out = resizer(src, self.getw(r), r, self.kernel, self.b, self.c, self.taps)
-            descale_out = imwri.Write(change_bitdepth(descale_out), 'png', f'{output_dir}/{self.filename}_{r:d}p%d.png')
+            descale_out = self.scaler.descaler(src, self.getw(r), r)
+            descale_out = imwri.Write(self.change_bitdepth(descale_out), 'png', f'{output_dir}/{self.filename}_{r:d}p%d.png')
             descale_out.get_frame(0)
 
     def get_filename(self):
         return ''.join([
             f"f_{self.frame}",
-            f"_k_{self.kernel}",
+            f"_k_{self.scaler.kernel}",
             f"_ar_{self.ar:.2f}",
             f"_{self.min_h}-{self.max_h}",
-            f"_b_{self.b:.2f}_c_{self.c:.2f}" if self.kernel == "bicubic" else "",
-            f"_taps_{self.taps}" if self.kernel == "lanczos" else "",
-            f"_[approximation]" if self.approx else "",
+            f"_b_{self.scaler.b:.2f}_c_{self.scaler.c:.2f}" if self.scaler.kernel == "bicubic" else "",
+            f"_taps_{self.scaler.taps}" if self.scaler.kernel == "lanczos" else "",
         ])
 
+    def change_bitdepth(self, bits=8, dither_type='error_diffusion'):
+        src_f = self.src.format
+        out_f = core.register_format(src_f.color_family, vapoursynth.INTEGER, bits, src_f.subsampling_w, src_f.subsampling_h)
 
-# TODO Check fmtc kernel befor calling fmtc here
-def upscale(src, width, height, kernel, b, c, taps):
-    resizer = getattr(src.resize, kernel.title())
-    if not resizer:
-        return src.fmtc.resample(width, height, kernel=kernel, a1=b, a2=c, taps=taps)
-    if kernel == 'bicubic':
-        resizer = partial(resizer, filter_param_a=b, filter_param_b=c)
-    elif kernel == 'lanczos':
-        resizer = partial(resizer, filter_param_a=taps)
+        return core.resize.Point(self.src, format=out_f.id, dither_type=dither_type)
 
-    return resizer(width, height)
+        # r39+
+        # return src.resize.Point(format=src.format.replace(bits_per_sample=bits, dither_type=dither_type))
 
 
-def descale_accurate(src, width, height, kernel, b, c, taps):
-    descale = getattr(src, 'descale_getnative', None)
-    if descale is None:
-        descale = getattr(src, 'descale')
-    descale = getattr(descale, 'De' + kernel)
-    if kernel == 'bicubic':
-        descale = partial(descale, b=b, c=c)
-    elif kernel == 'lanczos':
-        descale = partial(descale, taps=taps)
+def getnative(args: Union[List, argparse.Namespace], src: vapoursynth.VideoNode, scaler: Union[DefineScaler, None]) -> Tuple[List, pyplot.plot]:
+    """
+    Process your VideoNode with the getnative algorithm and return the result and a plot object
 
-    return descale(width, height)
+    :param args: List of all arguments for argparse or Namespace object from argparse
+    :param src: VideoNode from vapoursynth
+    :param scaler: DefineScaler object or None
+    :return: best resolutions list and plot matplotlib.pyplot
+    """
+    if type(args) == list:
+        args = parser.parse_args(args)
+
+    if (args.img or args.img_out) and imwri is None:
+        raise GetnativeException("imwri not found.")
+
+    if scaler:
+        scaler = scaler
+    elif args.kernel is None:
+        scaler = scaler_dict[args.scaler]
+    else:
+        scaler = DefineScaler(args.kernel, b=args.b, c=args.c, taps=args.taps)
+
+    if args.frame is None:
+        args.frame = src.num_frames // 3
+
+    if args.ar is 0:
+        args.ar = src.width / src.height
+
+    if args.min_h >= src.height:
+        raise GetnativeException(f"Input picture is smaller than min height")
+    elif args.min_h >= args.max_h:
+        raise GetnativeException(f"Min height must be smaller than max height")
+    elif args.max_h > src.height:
+        print(f"Your max height cant be bigger than your image dimensions. New max height is {src.height}")
+        args.max_h = src.height
+
+    getn = GetNative(src, scaler, args.ar, args.min_h, args.max_h, args.frame, args.img_out, args.plot_scaling,
+                     args.plot_format, args.show_plot, args.no_save)
+    try:
+        loop = asyncio.get_event_loop()
+        best_value, plot, resolutions = loop.run_until_complete(getn.run())
+    except ValueError as err:
+        raise GetnativeException(f"Error in getnative: {err}")
+
+    content = ''.join([
+        f"\nKernel: {scaler.kernel} ",
+        f"AR: {args.ar:.2f} ",
+        f"B: {scaler.b:.2f} C: {scaler.c:.2f} " if scaler.kernel == "bicubic" else "",
+        f"Taps: {scaler.taps} " if scaler.kernel == "lanczos" else "",
+        f"\n{best_value}",
+    ])
+    gc.collect()
+    print(content)
+
+    return resolutions, plot
 
 
-def descale_approx(src, width, height, kernel, b, c, taps):
-    return src.fmtc.resample(width, height, kernel=kernel, taps=taps, a1=b, a2=c, invks=True, invkstaps=taps)
+def _getnative():
+    args = parser.parse_args()
+
+    if args.use:
+        source_filter = _get_attr(core, args.use)
+        if not source_filter:
+            raise GetnativeException(f"{args.use} is not available in the current vapoursynth enviroment.")
+        print(f"Using {args.use} as source filter")
+    else:
+        source_filter = _get_source_filter(args)
+
+    src = source_filter(args.input_file)
+
+    if args.bilinear or args.bb:
+            getnative(args, src, scaler_dict["Bilinear"])
+    elif args.bicubic or args.bb:
+        for name, scaler in scaler_dict.items():
+            if "bicubic" in name.lower():
+                getnative(args, src, scaler)
+    elif args.all:
+        for scaler in scaler_dict.values():
+            getnative(args, src, scaler)
+    else:
+        getnative(args, src, None)
 
 
-def change_bitdepth(src, bits=8, dither_type='error_diffusion'):
-    src_f = src.format
-    out_f = core.register_format(src_f.color_family,
-                                 vapoursynth.INTEGER,
-                                 bits,
-                                 src_f.subsampling_w,
-                                 src_f.subsampling_h)
+def _get_source_filter(args):
+    ext = os.path.splitext(args.input_file)[1].lower()
+    if imwri and (args.img or ext in {".png", ".tif", ".tiff", ".bmp", ".jpg", ".jpeg", ".webp", ".tga", ".jp2"}):
+        print("Using imwri as source filter")
+        return imwri.Read
+    source_filter = _get_attr(core, 'ffms2.Source')
+    if source_filter:
+        print("Using ffms2 as source filter")
+        return source_filter
+    source_filter = _get_attr(core, 'lsmas.LWLibavSource')
+    if source_filter:
+        print("Using lsmas.LWLibavSource as source filter")
+        return source_filter
+    source_filter = _get_attr(core, 'lsmas.LSMASHVideoSource')
+    if source_filter:
+        print("Using lsmas.LSMASHVideoSource as source filter")
+        return source_filter
+    raise GetnativeException("No source filter found.")
 
-    return core.resize.Point(src, format=out_f.id, dither_type=dither_type)
 
-    # r39+
-    # return src.resize.Point(format=src.format.replace(bits_per_sample=bits, dither_type=dither_type))
-
-
-def to_float(str_value):
+def _to_float(str_value):
     if set(str_value) - set("0123456789./"):
         raise argparse.ArgumentTypeError("Invalid characters in float parameter")
     try:
@@ -236,7 +377,7 @@ def to_float(str_value):
         raise argparse.ArgumentTypeError("Exception while parsing float") from None
 
 
-def get_attr(obj, attr, default=None):
+def _get_attr(obj, attr, default=None):
     for ele in attr.split('.'):
         obj = getattr(obj, ele, default)
         if obj == default:
@@ -244,118 +385,30 @@ def get_attr(obj, attr, default=None):
     return obj
 
 
-def get_source_filter(args):
-    ext = os.path.splitext(args.input_file)[1].lower()
-    if imwri and (args.img or ext in {".png", ".tif", ".tiff", ".bmp", ".jpg", ".jpeg", ".webp", ".tga", ".jp2"}):
-        print("Using imwri as source filter")
-        return imwri.Read
-    source_filter = get_attr(core, 'ffms2.Source')
-    if source_filter:
-        print("Using ffms2 as source filter")
-        return source_filter
-    source_filter = get_attr(core, 'lsmas.LWLibavSource')
-    if source_filter:
-        print("Using lsmas.LWLibavSource as source filter")
-        return source_filter
-    source_filter = get_attr(core, 'lsmas.LSMASHVideoSource')
-    if source_filter:
-        print("Using lsmas.LSMASHVideoSource as source filter")
-        return source_filter
-    raise ValueError("No source filter found.")
-
-
 parser = argparse.ArgumentParser(description='Find the native resolution(s) of upscaled material (mostly anime)')
-parser.add_argument(dest='input_file', type=str, help='Absolute or relative path to the input file')
 parser.add_argument('--frame', '-f', dest='frame', type=int, default=None, help='Specify a frame for the analysis. Random if unspecified')
-parser.add_argument('--kernel', '-k', dest='kernel', type=str.lower, default='bilinear', help='Resize kernel to be used')
-parser.add_argument('--bicubic-b', '-b', dest='b', type=to_float, default="1/3", help='B parameter of bicubic resize')
-parser.add_argument('--bicubic-c', '-c', dest='c', type=to_float, default="1/3", help='C parameter of bicubic resize')
+parser.add_argument('--scaler', '-s', dest='scaler', type=str, choices=scaler_dict.keys(), default='Bicubic (b=1/3, c=1/3)', help='Use a predefined scaler.')
+parser.add_argument('--kernel', '-k', dest='kernel', type=str.lower, default=None, help='Resize kernel to be used')
+parser.add_argument('--bicubic-b', '-b', dest='b', type=_to_float, default="1/3", help='B parameter of bicubic resize')
+parser.add_argument('--bicubic-c', '-c', dest='c', type=_to_float, default="1/3", help='C parameter of bicubic resize')
 parser.add_argument('--lanczos-taps', '-t', dest='taps', type=int, default=3, help='Taps parameter of lanczos resize')
-parser.add_argument('--aspect-ratio', '-ar', dest='ar', type=to_float, default=0, help='Force aspect ratio. Only useful for anamorphic input')
-parser.add_argument('--approx', '-ap', dest="approx", action="store_true", help='Use fmtc instead of descale [faster, loss of accuracy]')
+parser.add_argument('--aspect-ratio', '-ar', dest='ar', type=_to_float, default=0, help='Force aspect ratio. Only useful for anamorphic input')
 parser.add_argument('--min-height', '-min', dest="min_h", type=int, default=500, help='Minimum height to consider')
 parser.add_argument('--max-height', '-max', dest="max_h", type=int, default=1000, help='Maximum height to consider')
-parser.add_argument('--use', '-u', help='Use specified source filter e.g. (lsmas.LWLibavSource)')
-parser.add_argument('--is-image', '-img', dest='img', action="store_true", help='Force image input')
-parser.add_argument('--generate-images', '-img-out', dest='img_out', action="store_true", help='Save detail mask as png')
+parser.add_argument('--generate-images', '-img-out', dest='img_out', action="store_true", default=False, help='Save detail mask as png')
 parser.add_argument('--plot-scaling', '-ps', dest='plot_scaling', type=str.lower, default='log', help='Scaling of the y axis. Can be "linear" or "log"')
 parser.add_argument('--plot-format', '-pf', dest='plot_format', type=str.lower, default='svg', help='Format of the output image. Can be svg, png, pdf, rgba, jp(e)g, tif(f), and probably more')
-parser.add_argument('--show-plot-gui', '-pg', dest='show_plot', action="store_true", help='Show an interactive plot gui window.')
-
-
-def getnative():
-    starttime = time.time()
-    args = parser.parse_args()
-
-    if (args.img or args.img_out) and imwri is None:
-        raise ValueError("imwri not found.")
-
-    if args.approx:
-        if not hasattr(core, 'fmtc'):
-            raise ValueError('fmtc not found')
-
-        try:
-            core.fmtc.resample(core.std.BlankClip(), kernel=args.kernel)
-        except vapoursynth.Error:
-            raise ValueError('fmtc: Invalid kernel specified.')
-    else:
-        if "toggaf.asi.xe" not in core.get_plugins():
-            if not hasattr(core, 'descale'):
-                raise ValueError('No descale found.\nIt is needed for accurate descaling')
-            print("Warning: only the really really slow descale is available.\n"
-                  "Download the modified descale for improved performance:\n"
-                  "https://github.com/BluBb-mADe/vapoursynth-descale")
-
-        if args.kernel not in ['spline36', 'spline16', 'lanczos', 'bicubic', 'bilinear']:
-            raise ValueError(f'descale: {args.kernel} is not a supported kernel. Try -ap for approximation.')
-
-    if args.use:
-        source_filter = get_attr(core, args.use)
-        if not source_filter:
-            raise ValueError(f"{args.use} is not available in the current vapoursynth enviroment.")
-        print(f"Using {args.use} as source filter")
-    else:
-        source_filter = get_source_filter(args)
-
-    src = source_filter(args.input_file)
-    if args.frame is None:
-        args.frame = src.num_frames // 3
-
-    if args.ar is 0:
-        args.ar = src.width / src.height
-
-    if args.min_h >= src.height:
-        raise ValueError(f"Picture is to small or equal for min height {args.min_h}.")
-    elif args.min_h >= args.max_h:
-        raise ValueError(f"Your min height is bigger or equal to max height.")
-    elif args.max_h > src.height:
-        print(f"Your max height cant be bigger than your image dimensions. New max height is {src.height}")
-        args.max_h = src.height
-
-    kwargs = args.__dict__.copy()
-    del kwargs["input_file"]
-    del kwargs["use"]
-    del kwargs["img"]
-
-    get_native = GetNative(src, **kwargs)
-    try:
-        loop = asyncio.get_event_loop()
-        best_value = loop.run_until_complete(get_native.run())
-    except ValueError as err:
-        return print(f"Error in getnative: {err}")
-
-    content = ''.join([
-        f"\nKernel: {args.kernel} ",
-        f"AR: {args.ar:.2f} ",
-        f"B: {args.b:.2f} C: {args.c:.2f} " if args.kernel == "bicubic" else "",
-        f"Taps: {args.taps} " if args.kernel == "lanczos" else "",
-        f"\n{best_value}",
-        f"\n[approximation]" if args.approx else "",
-    ])
-    print(content)
-    print('done in {:.2f} s'.format(time.time() - starttime))
-
-
+parser.add_argument('--show-plot-gui', '-pg', dest='show_plot', action="store_true", default=False, help='Show an interactive plot gui window.')
+parser.add_argument('--no-save', '-ns', dest='no_save', action="store_true", default=False, help='Do not save files to disk.')
+parser.add_argument('--is-image', '-img', dest='img', action="store_true", default=False, help='Force image input')
 if __name__ == '__main__':
-    print("Start getnative.")
-    getnative()
+    parser.add_argument(dest='input_file', type=str, help='Absolute or relative path to the input file')
+    parser.add_argument('--bilinear', '-bl', dest='bilinear', action="store_true", default=False, help='Run all predefined bilinear scalers.')
+    parser.add_argument('--bicubic', '-bc', dest='bicubic', action="store_true", default=False, help='Run all predefined bicubic scalers.')
+    parser.add_argument('--bc-bl', '-bb', dest='bb', action="store_true", default=False, help='Run all predefined bicubic and bilinear scalers.')
+    parser.add_argument('--run-all', '-all', dest='all', action="store_true", default=False, help='Run all scalers.')
+    parser.add_argument('--use', '-u', default=None, help='Use specified source filter e.g. (lsmas.LWLibavSource)')
+
+    starttime = time.time()
+    _getnative()
+    print(f'done in {time.time() - starttime:.2f}s')
