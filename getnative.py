@@ -208,6 +208,7 @@ class GetNative:
 
     def save_plot(self, vals):
         plot = pyplot
+        plot.close('all')
         plot.style.use('dark_background')
         plot.plot(range(self.min_h, self.max_h + 1), vals, '.w-')
         plot.title(self.filename)
@@ -336,7 +337,7 @@ def _getnative():
     src = source_filter(args.input_file)
 
     if args.bilinear or args.bb:
-            getnative(args, src, scaler_dict["Bilinear"])
+        getnative(args, src, scaler_dict["Bilinear"])
     elif args.bicubic or args.bb:
         for name, scaler in scaler_dict.items():
             if "bicubic" in name.lower():
