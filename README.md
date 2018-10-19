@@ -23,19 +23,20 @@ To run this script you will need:
 # Example Output
 Input Command:
 
-    $ python getnative.py "/input/path/00000.m2ts" -ls -k bicubic -pf png
+    $ python getnative.py /home/infi/mpv-shot0001.png -k bicubic -b 1/3 -c 1/3
 
 Output Text:
 ```
-Start getnative.
-Kernel: bicubic B: 0.33 C: 0.33 
-Native resolution(s) (best guess): 720p
-done in 19.51 s
+Using imwri as source filter
+501/501
+Kernel: bicubic AR: 1.78 B: 0.33 C: 0.33
+Native resolution(s) (best guess): 720p, 987p
+done in 29.07s
 ```
 
 Output Graph:
 
-![alt text](https://0x0.st/FaK.png)
+![alt text](https://nayu.moe/UavJvs)
 
 # Args
 

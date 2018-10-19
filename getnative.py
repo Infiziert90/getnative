@@ -32,6 +32,8 @@ class GetnativeException(BaseException):
 
 
 class DefineScaler:
+    check = False
+
     def __init__(self, kernel: str, b: Union[float, int]=0, c: Union[float, int]=0, taps: Union[float, int]=0):
         """
         Get a scaler for getnative from descale
@@ -71,13 +73,15 @@ class DefineScaler:
         return upscaler
 
     def check_input(self):
-        if "toggaf.asi.xe" not in core.get_plugins():
-            if not hasattr(core, 'descale'):
-                raise GetnativeException('No descale found.\nIt is needed for accurate descaling')
-            print("Warning: only the really really slow descale is available. (See README for help)\n")
+        if not self.check:
+            if "toggaf.asi.xe" not in core.get_plugins():
+                if not hasattr(core, 'descale'):
+                    raise GetnativeException('No descale found.\nIt is needed for accurate descaling')
+                print("Warning: only the really really slow descale is available. (See README for help)\n")
 
-        if self.kernel not in ['spline36', 'spline16', 'lanczos', 'bicubic', 'bilinear']:
-            raise GetnativeException(f'descale: {self.kernel} is not a supported kernel.')
+            if self.kernel not in ['spline36', 'spline16', 'lanczos', 'bicubic', 'bilinear']:
+                raise GetnativeException(f'descale: {self.kernel} is not a supported kernel.')
+            self.check = True
 
 
 scaler_dict = {
@@ -141,7 +145,7 @@ class GetNative:
         vals = []
         full_clip_len = len(full_clip)
         for frame_index in range(len(full_clip)):
-            print(f"{frame_index}/{full_clip_len}", end="\r")
+            print(f"{frame_index+1}/{full_clip_len}", end="\r")
             fut = asyncio.ensure_future(asyncio.wrap_future(full_clip.get_frame_async(frame_index)))
             tasks_pending.add(fut)
             futures[fut] = frame_index
