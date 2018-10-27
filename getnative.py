@@ -22,7 +22,6 @@ Thanks: BluBb_mADe, FichteFoll, stux!, Frechdachs
 
 core = vapoursynth.core
 core.add_cache = False
-core.accept_lowercase = True
 imwri = getattr(core, "imwri", getattr(core, "imwrif", None))
 output_dir = os.path.splitext(os.path.basename(__file__))[0]
 
@@ -52,9 +51,7 @@ class DefineScaler:
         self.upscaler = self.get_upscaler()
 
     def get_descaler(self):
-        descaler = getattr(core, 'descale_getnative', None)
-        if descaler is None:
-            descaler = getattr(core, 'descale')
+        descaler = getattr(core, 'descale_getnative', getattr(core, 'descale'))
         descaler = getattr(descaler, 'De' + self.kernel)
         if self.kernel == 'bicubic':
             descaler = partial(descaler, b=self.b, c=self.c)
@@ -78,10 +75,10 @@ class DefineScaler:
                 if not hasattr(core, 'descale'):
                     raise GetnativeException('No descale found.\nIt is needed for accurate descaling')
                 print("Warning: only the really really slow descale is available. (See README for help)\n")
+                self.check = True
 
-            if self.kernel not in ['spline36', 'spline16', 'lanczos', 'bicubic', 'bilinear']:
-                raise GetnativeException(f'descale: {self.kernel} is not a supported kernel.')
-            self.check = True
+        if self.kernel not in ['spline36', 'spline16', 'lanczos', 'bicubic', 'bilinear']:
+            raise GetnativeException(f'descale: {self.kernel} is not a supported kernel.')
 
 
 scaler_dict = {
@@ -232,22 +229,22 @@ class GetNative:
         temp = self.scaler.descaler(clip, final_width, final_height)
         temp = self.scaler.upscaler(temp, clip.width, clip.height)
         mask = core.std.Expr([clip, temp], 'x y - abs dup 0.015 > swap 16 * 0 ?').std.Inflate()
-        mask = scaler_dict["Spline36"].upscaler(mask, final_width, final_height)
+        mask = scaler_dict['Spline36'].upscaler(mask, final_width, final_height)
 
-        return self.change_bitdepth(mask, dither_type="none")
+        return mask
 
     # TODO: use PIL for output
     def save_images(self, src_luma32):
         src = src_luma32
-        first_out = imwri.Write(self.change_bitdepth(src), 'png', f'{output_dir}/{self.filename}_source%d.png')
+        first_out = imwri.Write(src, 'png', f'{output_dir}/{self.filename}_source%d.png')
         first_out.get_frame(0)  # trick vapoursynth into rendering the frame
         for r in self.resolutions:
             r += self.min_h
             image = self.mask_detail(src, self.getw(r), r)
-            mask_out = imwri.Write(self.change_bitdepth(image), 'png', f'{output_dir}/{self.filename}_mask_{r:d}p%d.png')
+            mask_out = imwri.Write(image, 'png', f'{output_dir}/{self.filename}_mask_{r:d}p%d.png')
             mask_out.get_frame(0)
             descale_out = self.scaler.descaler(src, self.getw(r), r)
-            descale_out = imwri.Write(self.change_bitdepth(descale_out), 'png', f'{output_dir}/{self.filename}_{r:d}p%d.png')
+            descale_out = imwri.Write(descale_out, 'png', f'{output_dir}/{self.filename}_{r:d}p%d.png')
             descale_out.get_frame(0)
 
     def get_filename(self):
@@ -259,15 +256,6 @@ class GetNative:
             f"_b_{self.scaler.b:.2f}_c_{self.scaler.c:.2f}" if self.scaler.kernel == "bicubic" else "",
             f"_taps_{self.scaler.taps}" if self.scaler.kernel == "lanczos" else "",
         ])
-
-    def change_bitdepth(self, bits=8, dither_type='error_diffusion'):
-        src_f = self.src.format
-        out_f = core.register_format(src_f.color_family, vapoursynth.INTEGER, bits, src_f.subsampling_w, src_f.subsampling_h)
-
-        return core.resize.Point(self.src, format=out_f.id, dither_type=dither_type)
-
-        # r39+
-        # return src.resize.Point(format=src.format.replace(bits_per_sample=bits, dither_type=dither_type))
 
 
 def getnative(args: Union[List, argparse.Namespace], src: vapoursynth.VideoNode, scaler: Union[DefineScaler, None]) -> Tuple[List, pyplot.plot]:
