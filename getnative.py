@@ -396,11 +396,12 @@ parser.add_argument('--no-save', '-ns', dest='no_save', action="store_true", def
 parser.add_argument('--is-image', '-img', dest='img', action="store_true", default=False, help='Force image input')
 if __name__ == '__main__':
     parser.add_argument(dest='input_file', type=str, help='Absolute or relative path to the input file')
-    parser.add_argument('--bilinear', '-bl', dest='bilinear', action="store_true", default=False, help='Run all predefined bilinear scalers.')
-    parser.add_argument('--bicubic', '-bc', dest='bicubic', action="store_true", default=False, help='Run all predefined bicubic scalers.')
-    parser.add_argument('--bc-bl', '-bb', dest='bb', action="store_true", default=False, help='Run all predefined bicubic and bilinear scalers.')
-    parser.add_argument('--run-all', '-all', dest='all', action="store_true", default=False, help='Run all scalers.')
     parser.add_argument('--use', '-u', default=None, help='Use specified source filter e.g. (lsmas.LWLibavSource)')
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('--bilinear', '-bl', dest='bilinear', action="store_true", default=False, help='Run all predefined bilinear scalers.')
+    group.add_argument('--bicubic', '-bc', dest='bicubic', action="store_true", default=False, help='Run all predefined bicubic scalers.')
+    group.add_argument('--bc-bl', '-bb', dest='bb', action="store_true", default=False, help='Run all predefined bicubic and bilinear scalers.')
+    group.add_argument('--run-all', '-all', dest='all', action="store_true", default=False, help='Run all scalers.')
 
     starttime = time.time()
     _getnative()
