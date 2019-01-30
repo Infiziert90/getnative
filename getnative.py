@@ -31,8 +31,6 @@ class GetnativeException(BaseException):
 
 
 class DefineScaler:
-    check = False
-
     def __init__(self, kernel: str, b: Union[float, int]=0, c: Union[float, int]=0, taps: Union[float, int]=0):
         """
         Get a scaler for getnative from descale
@@ -70,13 +68,6 @@ class DefineScaler:
         return upscaler
 
     def check_input(self):
-        if not self.check:
-            if "toggaf.asi.xe" not in core.get_plugins():
-                if not hasattr(core, 'descale'):
-                    raise GetnativeException('No descale found.\nIt is needed for accurate descaling')
-                print("Warning: only the really really slow descale is available. (See README for help)\n")
-                self.check = True
-
         if self.kernel not in ['spline36', 'spline16', 'lanczos', 'bicubic', 'bilinear']:
             raise GetnativeException(f'descale: {self.kernel} is not a supported kernel.')
 
@@ -273,6 +264,11 @@ def getnative(args: Union[List, argparse.Namespace], src: vapoursynth.VideoNode,
     if (args.img or args.img_out) and imwri is None:
         raise GetnativeException("imwri not found.")
 
+    if "toggaf.asi.xe" not in core.get_plugins():
+        if not hasattr(core, 'descale'):
+            raise GetnativeException('No descale found.\nIt is needed for accurate descaling')
+        print("Warning: only the really really slow descale is available. (See README for help)\n")
+
     if scaler:
         scaler = scaler
     elif args.kernel is None:
@@ -282,6 +278,10 @@ def getnative(args: Union[List, argparse.Namespace], src: vapoursynth.VideoNode,
 
     if args.frame is None:
         args.frame = src.num_frames // 3
+    elif args.frame < 0:
+        args.frame = src.num_frames // -args.frame
+    elif args.frame > src.num_frames - 1:
+        raise GetnativeException(f"Frame number is to big, max allowed: {args.number_frames - 1}")
 
     if args.ar is 0:
         args.ar = src.width / src.height
@@ -330,14 +330,14 @@ def _getnative():
 
     if args.bilinear or args.bb:
         getnative(args, src, scaler_dict["Bilinear"])
-    elif args.bicubic or args.bb:
+    if args.bicubic or args.bb:  # IF is needed for bb run
         for name, scaler in scaler_dict.items():
             if "bicubic" in name.lower():
                 getnative(args, src, scaler)
     elif args.all:
         for scaler in scaler_dict.values():
             getnative(args, src, scaler)
-    else:
+    elif not args.bilinear and not args.bb:  # ELIF is needed for bb run
         getnative(args, src, None)
 
 
@@ -379,7 +379,7 @@ def _get_attr(obj, attr, default=None):
 
 
 parser = argparse.ArgumentParser(description='Find the native resolution(s) of upscaled material (mostly anime)')
-parser.add_argument('--frame', '-f', dest='frame', type=int, default=None, help='Specify a frame for the analysis. Random if unspecified')
+parser.add_argument('--frame', '-f', dest='frame', type=int, default=None, help='Specify a frame for the analysis. Random if unspecified. Negative frame numbers for a frame like this: src.num_frames // -args.frame')
 parser.add_argument('--scaler', '-s', dest='scaler', type=str, choices=scaler_dict.keys(), default='Bicubic (b=1/3, c=1/3)', help='Use a predefined scaler.')
 parser.add_argument('--kernel', '-k', dest='kernel', type=str.lower, default=None, help='Resize kernel to be used')
 parser.add_argument('--bicubic-b', '-b', dest='b', type=_to_float, default="1/3", help='B parameter of bicubic resize')
