@@ -17,7 +17,7 @@ To run this script you will need:
 * Python 3.6
 * [matplotlib](http://matplotlib.org/users/installing.html)
 * [Vapoursynth](http://www.vapoursynth.com) R39+
-* [descale](https://github.com/Irrational-Encoding-Wizardry/vapoursynth-descale) or [descale_getnative](https://github.com/BluBb-mADe/vapoursynth-descale)
+* [descale](https://github.com/Irrational-Encoding-Wizardry/vapoursynth-descale) (really really slow) or [descale_getnative](https://github.com/BluBb-mADe/vapoursynth-descale) (perfect for getnative)
 * [ffms2](https://github.com/FFMS/ffms2) or [lsmash](https://github.com/VFR-maniac/L-SMASH-Works) or [imwri](https://forum.doom9.org/showthread.php?t=170981)
 
 # Example Output
