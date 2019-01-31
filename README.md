@@ -17,7 +17,7 @@ To run this script you will need:
 * Python 3.6
 * [matplotlib](http://matplotlib.org/users/installing.html)
 * [Vapoursynth](http://www.vapoursynth.com) R39+
-* [descale](https://github.com/Irrational-Encoding-Wizardry/vapoursynth-descale) (really really slow) or [descale_getnative](https://github.com/BluBb-mADe/vapoursynth-descale) (perfect for getnative)
+* [descale](https://github.com/Irrational-Encoding-Wizardry/vapoursynth-descale) (really slow for descale) or [descale_getnative](https://github.com/BluBb-mADe/vapoursynth-descale) (perfect for getnative)
 * [ffms2](https://github.com/FFMS/ffms2) or [lsmash](https://github.com/VFR-maniac/L-SMASH-Works) or [imwri](https://forum.doom9.org/showthread.php?t=170981)
 
 # Example Output
@@ -45,7 +45,7 @@ Output Graph:
 | help | Automatically render the usage information when running `-h` or `--help` | False | Action |
 |  | Absolute or relative path to the input file | Required | String |
 | frame | Specify a frame for the analysis. | num_frames//3 | Int |
-| scaler | Use a predefined scaler. | Bicubic (b=1/3, c=1/3) | String |
+| mode | Choose a predefined mode \["bilinear", "bicubic", "bl-bc", "all"\] | None | String |
 | kernel | Resize kernel to be used | bilinear | String |
 | bicubic-b | B parameter of bicubic resize | 1/3 | Float |
 | bicubic-c | C parameter of bicubic resize | 1/3 | Float |
@@ -59,10 +59,6 @@ Output Graph:
 | plot-scaling | Scaling of the y axis. Can be "linear" or "log" | log | String |
 | plot-format | Format of the output image. Can be svg, png, tif(f), and more | svg | String |
 | show-plot-gui | Show an interactive plot gui window. | False | Action |
-| bilinear | Run all predefined bilinear scalers. | False | Action |
-| bicubic | Run all predefined bicubic scalers. | False | Action |
-| bc-bl | Run all predefined bicubic and bilinear scalers. | False | Action |
-| run-all | Run all scalers. | False | Action |
 | no-save | Do not save files to disk. | False | Action |
 
 

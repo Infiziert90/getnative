@@ -18,12 +18,15 @@ except BaseException:
 Rework by Infi
 Original Author: kageru https://gist.github.com/kageru/549e059335d6efbae709e567ed081799
 Thanks: BluBb_mADe, FichteFoll, stux!, Frechdachs
+
+Version: 1.2.5
 """
 
 core = vapoursynth.core
 core.add_cache = False
 imwri = getattr(core, "imwri", getattr(core, "imwrif", None))
 output_dir = os.path.splitext(os.path.basename(__file__))[0]
+_modes = ["bilinear", "bicubic", "bl-bc", "all"]
 
 
 class GetnativeException(BaseException):
@@ -271,8 +274,6 @@ def getnative(args: Union[List, argparse.Namespace], src: vapoursynth.VideoNode,
 
     if scaler:
         scaler = scaler
-    elif args.kernel is None:
-        scaler = scaler_dict[args.scaler]
     else:
         scaler = DefineScaler(args.kernel, b=args.b, c=args.c, taps=args.taps)
 
@@ -328,16 +329,16 @@ def _getnative():
 
     src = source_filter(args.input_file)
 
-    if args.bilinear or args.bb:
+    if args.mode == "bilinear" or args.mode == "bl-bc":
         getnative(args, src, scaler_dict["Bilinear"])
-    if args.bicubic or args.bb:  # IF is needed for bb run
+    if args.mode == "bicubic" or args.mode == "bl-bc":  # IF is needed for bl-bc run
         for name, scaler in scaler_dict.items():
             if "bicubic" in name.lower():
                 getnative(args, src, scaler)
-    elif args.all:
+    elif args.mode == "all":
         for scaler in scaler_dict.values():
             getnative(args, src, scaler)
-    elif not args.bilinear and not args.bb:  # ELIF is needed for bb run
+    elif args.mode != "bilinear":  # ELIF is needed for bl-bc run
         getnative(args, src, None)
 
 
@@ -380,7 +381,6 @@ def _get_attr(obj, attr, default=None):
 
 parser = argparse.ArgumentParser(description='Find the native resolution(s) of upscaled material (mostly anime)')
 parser.add_argument('--frame', '-f', dest='frame', type=int, default=None, help='Specify a frame for the analysis. Random if unspecified. Negative frame numbers for a frame like this: src.num_frames // -args.frame')
-parser.add_argument('--scaler', '-s', dest='scaler', type=str, choices=scaler_dict.keys(), default='Bicubic (b=1/3, c=1/3)', help='Use a predefined scaler.')
 parser.add_argument('--kernel', '-k', dest='kernel', type=str.lower, default=None, help='Resize kernel to be used')
 parser.add_argument('--bicubic-b', '-b', dest='b', type=_to_float, default="1/3", help='B parameter of bicubic resize')
 parser.add_argument('--bicubic-c', '-c', dest='c', type=_to_float, default="1/3", help='C parameter of bicubic resize')
@@ -397,11 +397,7 @@ parser.add_argument('--is-image', '-img', dest='img', action="store_true", defau
 if __name__ == '__main__':
     parser.add_argument(dest='input_file', type=str, help='Absolute or relative path to the input file')
     parser.add_argument('--use', '-u', default=None, help='Use specified source filter e.g. (lsmas.LWLibavSource)')
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument('--bilinear', '-bl', dest='bilinear', action="store_true", default=False, help='Run all predefined bilinear scalers.')
-    group.add_argument('--bicubic', '-bc', dest='bicubic', action="store_true", default=False, help='Run all predefined bicubic scalers.')
-    group.add_argument('--bc-bl', '-bb', dest='bb', action="store_true", default=False, help='Run all predefined bicubic and bilinear scalers.')
-    group.add_argument('--run-all', '-all', dest='all', action="store_true", default=False, help='Run all scalers.')
+    parser.add_argument('--mode', '-m', dest='mode', type=str, choices=_modes, default=None, help='Choose a predefined mode \["bilinear", "bicubic", "bl-bc", "all"\]')
 
     starttime = time.time()
     _getnative()
