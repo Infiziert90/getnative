@@ -57,7 +57,7 @@ Output Graph:
 | is-image | Force image input | False | Action |
 | generate-images | Save detail mask as png | False | Action |
 | plot-scaling | Scaling of the y axis. Can be "linear" or "log" | log | String |
-| plot-format | Format of the output image. Can be svg, png, tif(f), and more | svg | String |
+| plot-format | Format of the output image. Specify multiple formats separated by commas. Can be svg, png, tif(f), and more | svg | String |
 | show-plot-gui | Show an interactive plot gui window. | False | Action |
 | no-save | Do not save files to disk. | False | Action |
 
