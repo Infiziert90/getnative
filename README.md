@@ -46,7 +46,7 @@ Output Graph:
 |  | Absolute or relative path to the input file | Required | String |
 | frame | Specify a frame for the analysis. | num_frames//3 | Int |
 | mode | Choose a predefined mode \["bilinear", "bicubic", "bl-bc", "all"\] | None | String |
-| kernel | Resize kernel to be used | bilinear | String |
+| kernel | Resize kernel to be used | bicubic | String |
 | bicubic-b | B parameter of bicubic resize | 1/3 | Float |
 | bicubic-c | C parameter of bicubic resize | 1/3 | Float |
 | lanczos-taps | Taps parameter of lanczos resize | 3 | Int |

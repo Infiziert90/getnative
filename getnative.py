@@ -381,7 +381,7 @@ def _get_attr(obj, attr, default=None):
 
 parser = argparse.ArgumentParser(description='Find the native resolution(s) of upscaled material (mostly anime)')
 parser.add_argument('--frame', '-f', dest='frame', type=int, default=None, help='Specify a frame for the analysis. Random if unspecified. Negative frame numbers for a frame like this: src.num_frames // -args.frame')
-parser.add_argument('--kernel', '-k', dest='kernel', type=str.lower, default=None, help='Resize kernel to be used')
+parser.add_argument('--kernel', '-k', dest='kernel', type=str.lower, default="bicubic", help='Resize kernel to be used')
 parser.add_argument('--bicubic-b', '-b', dest='b', type=_to_float, default="1/3", help='B parameter of bicubic resize')
 parser.add_argument('--bicubic-c', '-c', dest='c', type=_to_float, default="1/3", help='C parameter of bicubic resize')
 parser.add_argument('--lanczos-taps', '-t', dest='taps', type=int, default=3, help='Taps parameter of lanczos resize')
