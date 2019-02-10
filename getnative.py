@@ -19,7 +19,7 @@ Rework by Infi
 Original Author: kageru https://gist.github.com/kageru/549e059335d6efbae709e567ed081799
 Thanks: BluBb_mADe, FichteFoll, stux!, Frechdachs
 
-Version: 1.2.5
+Version: 1.2.6
 """
 
 core = vapoursynth.core
