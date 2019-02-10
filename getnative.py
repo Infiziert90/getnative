@@ -211,7 +211,8 @@ class GetNative:
         plot.xlabel('Resolution')
         plot.yscale(self.plot_scaling)
         if not self.no_save:
-            plot.savefig(f'{output_dir}/{self.filename}.{self.plot_format}')
+            for fmt in self.plot_format.split(','):
+                plot.savefig(f'{output_dir}/{self.filename}.{fmt}')
         if self.show_plot:
             plot.show()
 
@@ -390,7 +391,7 @@ parser.add_argument('--min-height', '-min', dest="min_h", type=int, default=500,
 parser.add_argument('--max-height', '-max', dest="max_h", type=int, default=1000, help='Maximum height to consider')
 parser.add_argument('--generate-images', '-img-out', dest='img_out', action="store_true", default=False, help='Save detail mask as png')
 parser.add_argument('--plot-scaling', '-ps', dest='plot_scaling', type=str.lower, default='log', help='Scaling of the y axis. Can be "linear" or "log"')
-parser.add_argument('--plot-format', '-pf', dest='plot_format', type=str.lower, default='svg', help='Format of the output image. Can be svg, png, pdf, rgba, jp(e)g, tif(f), and probably more')
+parser.add_argument('--plot-format', '-pf', dest='plot_format', type=str.lower, default='svg', help='Format of the output image. Specify multiple formats separated by commas. Can be svg, png, pdf, rgba, jp(e)g, tif(f), and probably more')
 parser.add_argument('--show-plot-gui', '-pg', dest='show_plot', action="store_true", default=False, help='Show an interactive plot gui window.')
 parser.add_argument('--no-save', '-ns', dest='no_save', action="store_true", default=False, help='Do not save files to disk.')
 parser.add_argument('--is-image', '-img', dest='img', action="store_true", default=False, help='Force image input')
