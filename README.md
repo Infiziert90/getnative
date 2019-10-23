@@ -51,8 +51,8 @@ Output Graph:
 | bicubic-c | C parameter of bicubic resize | 1/3 | Float |
 | lanczos-taps | Taps parameter of lanczos resize | 3 | Int |
 | aspect-ratio | Force aspect ratio. Only useful for anamorphic input| w/h | Float |
-| min-heigth | Minimum height to consider | 500 | Int |
-| max-heigth | Maximum height to consider | 1000 | Int |
+| min-height | Minimum height to consider | 500 | Int |
+| max-height | Maximum height to consider | 1000 | Int |
 | use | Use specified source filter (e.g. "lsmas.LWLibavSource") | None | String |
 | is-image | Force image input | False | Action |
 | generate-images | Save detail mask as png | False | Action |
