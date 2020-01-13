@@ -351,7 +351,7 @@ def _get_source_filter(args):
     source_filter = _get_attr(core, 'ffms2.Source')
     if source_filter:
         print("Using ffms2 as source filter")
-        return source_filter
+        return lambda input_file: source_filter(input_file, alpha=False)
     source_filter = _get_attr(core, 'lsmas.LWLibavSource')
     if source_filter:
         print("Using lsmas.LWLibavSource as source filter")
