@@ -342,12 +342,19 @@ def _getnative():
     elif args.mode != "bilinear":  # ELIF is needed for bl-bc run
         getnative(args, src, None)
 
+def _vpy_source_filter(path):
+    import runpy
+    runpy.run_path(path, {}, "__vapoursynth__")
+    return vapoursynth.get_output(0)
 
 def _get_source_filter(args):
     ext = os.path.splitext(args.input_file)[1].lower()
     if imwri and (args.img or ext in {".png", ".tif", ".tiff", ".bmp", ".jpg", ".jpeg", ".webp", ".tga", ".jp2"}):
         print("Using imwri as source filter")
         return imwri.Read
+    if ext in {".py", ".pyw", ".vpy"}:
+        print("Using custom VapourSynth script as a source. This may cause garbage results. Only do this if you know what you are doing.")
+        return _vpy_source_filter
     source_filter = _get_attr(core, 'ffms2.Source')
     if source_filter:
         print("Using ffms2 as source filter")
