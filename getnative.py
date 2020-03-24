@@ -353,7 +353,7 @@ def _get_source_filter(args):
         print("Using imwri as source filter")
         return imwri.Read
     if ext in {".py", ".pyw", ".vpy"}:
-        print("Using custom VapourSynth script as a source. Only do this if you know what you are doing. No support given if using this method.")
+        print("Using custom VapourSynth script as a source. This may cause garbage results. Only do this if you know what you are doing.")
         return _vpy_source_filter
     source_filter = _get_attr(core, 'ffms2.Source')
     if source_filter:
