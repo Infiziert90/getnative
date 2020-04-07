@@ -19,7 +19,7 @@ Rework by Infi
 Original Author: kageru https://gist.github.com/kageru/549e059335d6efbae709e567ed081799
 Thanks: BluBb_mADe, FichteFoll, stux!, Frechdachs
 
-Version: 1.3.0
+Version: 1.3.1
 """
 
 core = vapoursynth.core
@@ -285,7 +285,7 @@ def getnative(args: Union[List, argparse.Namespace], src: vapoursynth.VideoNode,
     elif args.frame > src.num_frames - 1:
         raise GetnativeException(f"Frame number is to big, max allowed: {args.number_frames - 1}")
 
-    if args.ar is 0:
+    if args.ar == 0:
         args.ar = src.width / src.height
 
     if args.min_h >= src.height:
@@ -342,10 +342,12 @@ def _getnative():
     elif args.mode != "bilinear":  # ELIF is needed for bl-bc run
         getnative(args, src, None)
 
+
 def _vpy_source_filter(path):
     import runpy
     runpy.run_path(path, {}, "__vapoursynth__")
     return vapoursynth.get_output(0)
+
 
 def _get_source_filter(args):
     ext = os.path.splitext(args.input_file)[1].lower()
@@ -405,7 +407,7 @@ parser.add_argument('--is-image', '-img', dest='img', action="store_true", defau
 if __name__ == '__main__':
     parser.add_argument(dest='input_file', type=str, help='Absolute or relative path to the input file')
     parser.add_argument('--use', '-u', default=None, help='Use specified source filter e.g. (lsmas.LWLibavSource)')
-    parser.add_argument('--mode', '-m', dest='mode', type=str, choices=_modes, default=None, help='Choose a predefined mode \["bilinear", "bicubic", "bl-bc", "all"\]')
+    parser.add_argument('--mode', '-m', dest='mode', type=str, choices=_modes, default=None, help='Choose a predefined mode ["bilinear", "bicubic", "bl-bc", "all"]')
 
     starttime = time.time()
     _getnative()
