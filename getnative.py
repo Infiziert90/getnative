@@ -283,17 +283,17 @@ def getnative(args: Union[List, argparse.Namespace], src: vapoursynth.VideoNode,
     elif args.frame < 0:
         args.frame = src.num_frames // -args.frame
     elif args.frame > src.num_frames - 1:
-        raise GetnativeException(f"Frame number is to big, max allowed: {args.number_frames - 1}")
+        raise GetnativeException(f"Frame is incorrect: {args.number_frames - 1}")
 
     if args.ar == 0:
         args.ar = src.width / src.height
 
     if args.min_h >= src.height:
-        raise GetnativeException(f"Input picture is smaller than min height")
+        raise GetnativeException(f"Input image is smaller than min height")
     elif args.min_h >= args.max_h:
         raise GetnativeException(f"Min height must be smaller than max height")
     elif args.max_h > src.height:
-        print(f"Your max height cant be bigger than your image dimensions. New max height is {src.height}")
+        print(f"Your max height is over the image dimensions. New max height is {src.height}")
         args.max_h = src.height
 
     getn = GetNative(src, scaler, args.ar, args.min_h, args.max_h, args.frame, args.img_out, args.plot_scaling,
