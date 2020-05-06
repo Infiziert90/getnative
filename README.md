@@ -17,7 +17,8 @@ To run this script you will need:
 * Python 3.6
 * [matplotlib](http://matplotlib.org/users/installing.html)
 * [Vapoursynth](http://www.vapoursynth.com) R39+
-* [descale](https://github.com/Irrational-Encoding-Wizardry/vapoursynth-descale) (really slow for descale) or [descale_getnative](https://github.com/BluBb-mADe/vapoursynth-descale) (perfect for getnative)
+* [descale](https://github.com/Irrational-Encoding-Wizardry/vapoursynth-descale) (really slow for descale but needed for spline64 and lanczos5) 
+and/or [descale_getnative](https://github.com/OrangeChannel/vapoursynth-descale) (perfect for getnative)
 * [ffms2](https://github.com/FFMS/ffms2) or [lsmash](https://github.com/VFR-maniac/L-SMASH-Works) or [imwri](https://forum.doom9.org/showthread.php?t=170981)
 
 # Example Output
@@ -42,10 +43,7 @@ Output Graph:
 
 | Property | Description | Default value | Type |
 | -------- | ----------- | ------------------ | ---- |
-| help | Automatically render the usage information when running `-h` or `--help` | False | Action |
-|  | Absolute or relative path to the input file | Required | String |
 | frame | Specify a frame for the analysis. | num_frames//3 | Int |
-| mode | Choose a predefined mode \["bilinear", "bicubic", "bl-bc", "all"\] | None | String |
 | kernel | Resize kernel to be used | bicubic | String |
 | bicubic-b | B parameter of bicubic resize | 1/3 | Float |
 | bicubic-c | C parameter of bicubic resize | 1/3 | Float |
@@ -53,14 +51,22 @@ Output Graph:
 | aspect-ratio | Force aspect ratio. Only useful for anamorphic input| w/h | Float |
 | min-height | Minimum height to consider | 500 | Int |
 | max-height | Maximum height to consider | 1000 | Int |
-| use | Use specified source filter (e.g. "lsmas.LWLibavSource") | None | String |
 | is-image | Force image input | False | Action |
 | generate-images | Save detail mask as png | False | Action |
 | plot-scaling | Scaling of the y axis. Can be "linear" or "log" | log | String |
 | plot-format | Format of the output image. Specify multiple formats separated by commas. Can be svg, png, tif(f), and more | svg | String |
 | show-plot-gui | Show an interactive plot gui window. | False | Action |
 | no-save | Do not save files to disk. | False | Action |
+| stepping | This changes the way getnative will handle resolutions. Example steps=3 [500p, 503p, 506p ...] | 1 | Int |
 
+# CLI Args
+
+| Property | Description | Default value | Type |
+| -------- | ----------- | ------------------ | ---- |
+| help | Automatically render the usage information when running `-h` or `--help` | False | Action |
+|  | Absolute or relative path to the input file | Required | String |
+| mode | Choose a predefined mode \["bilinear", "bicubic", "bl-bc", "all"\] | None | String |
+| use | Use specified source filter (e.g. "lsmas.LWLibavSource") | None | String |
 
 # Warning
 This script's success rate is far from perfect.
@@ -72,7 +78,7 @@ to automatically recognize 1080p productions.
 Use your eyes or anibin if necessary.
   
 # Thanks  
-BluBb_mADe, kageru, FichteFoll, stux!
+BluBb_mADe, kageru, FichteFoll, stux!, LittlePox
 
 # Help?
 
