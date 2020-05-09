@@ -25,8 +25,6 @@ Thanks: BluBb_mADe, FichteFoll, stux!, Frechdachs, LittlePox
 core = vapoursynth.core
 core.add_cache = False
 imwri = getattr(core, "imwri", getattr(core, "imwrif", None))
-parent_dir = Path(__file__).resolve().parents[1]
-output_dir = f"{parent_dir}/results"
 _modes = ["bilinear", "bicubic", "bl-bc", "all"]
 _descale = plugin_from_identifier(core, "tegaf.asi.xe")
 if _descale is None:
@@ -113,8 +111,8 @@ common_scaler = {
 
 
 class GetNative:
-    def __init__(self, src, scaler, ar, min_h, max_h, frame, img_out, plot_scaling, plot_format, show_plot, no_save,
-                 steps):
+    def __init__(self, src, scaler, ar, min_h, max_h, frame, mask_out, plot_scaling, plot_format, show_plot, no_save,
+                 steps, output_dir):
         self.plot_format = plot_format
         self.plot_scaling = plot_scaling
         self.src = src
@@ -123,10 +121,11 @@ class GetNative:
         self.ar = ar
         self.scaler = scaler
         self.frame = frame
-        self.img_out = img_out
+        self.mask_out = mask_out
         self.show_plot = show_plot
         self.no_save = no_save
         self.steps = steps
+        self.output_dir = output_dir
         self.txt_output = ""
         self.resolutions = []
         self.filename = self.get_filename()
@@ -171,11 +170,11 @@ class GetNative:
         vals += [(futures.pop(task), task.result().props.PlaneStatsAverage) for task in tasks_done]
         vals = [v for _, v in sorted(vals)]
         ratios, vals, txt_output, best_value = self.analyze_results(vals)
-        if not os.path.isdir(output_dir):
-            os.mkdir(output_dir)
+        if not os.path.isdir(self.output_dir):
+            os.mkdir(self.output_dir)
 
         plot = self.save_plot(vals)
-        if not self.no_save and self.img_out:
+        if not self.no_save and self.mask_out:
             self.save_images(src_luma32)
 
         txt_output += 'Raw data:\nResolution\t | Relative Error\t | Relative difference from last\n'
@@ -186,7 +185,7 @@ class GetNative:
         self.txt_output = txt_output  # if anyone needs this later
 
         if not self.no_save:
-            with open(f"{output_dir}/{self.filename}.txt", "w") as stream:
+            with open(f"{self.output_dir}/{self.filename}.txt", "w") as stream:
                 stream.writelines(txt_output)
 
         return best_value, plot, self.resolutions
@@ -244,7 +243,7 @@ class GetNative:
         ax.set(xlabel="Height", xticks=ticks, ylabel="Relative error", title=self.filename, yscale="log")
         if not self.no_save:
             for fmt in self.plot_format.replace(" ", "").split(','):
-                fig.savefig(f'{output_dir}/{self.filename}.{fmt}')
+                fig.savefig(f'{self.output_dir}/{self.filename}.{fmt}')
         if self.show_plot:
             plot.show()
 
@@ -262,15 +261,15 @@ class GetNative:
 
     def save_images(self, src_luma32):
         src = src_luma32
-        first_out = imwri.Write(src, 'png', f'{output_dir}/{self.filename}_source%d.png')
+        first_out = imwri.Write(src, 'png', f'{self.output_dir}/{self.filename}_source%d.png')
         first_out.get_frame(0)  # trick vapoursynth into rendering the frame
         for r in self.resolutions:
-            r += self.min_h
+            r = r * self.steps + self.min_h
             image = self.mask_detail(src, self.getw(r), r)
-            mask_out = imwri.Write(image, 'png', f'{output_dir}/{self.filename}_mask_{r:d}p%d.png')
+            mask_out = imwri.Write(image, 'png', f'{self.output_dir}/{self.filename}_mask_{r:d}p%d.png')
             mask_out.get_frame(0)
             descale_out = self.scaler.descaler(src, self.getw(r), r)
-            descale_out = imwri.Write(descale_out, 'png', f'{output_dir}/{self.filename}_{r:d}p%d.png')
+            descale_out = imwri.Write(descale_out, 'png', f'{self.output_dir}/{self.filename}_{r:d}p%d.png')
             descale_out.get_frame(0)
 
     def get_filename(self):
@@ -296,7 +295,12 @@ def getnative(args: Union[List, argparse.Namespace], src: vapoursynth.VideoNode,
     if type(args) == list:
         args = parser.parse_args(args)
 
-    if (args.img or args.img_out) and imwri is None:
+    output_dir = f"{Path().resolve()}" if args.dir == "" else args.dir
+    if not os.access(output_dir, os.W_OK):
+        raise PermissionError(f"Missing write permissions: {output_dir}")
+    output_dir = f"{Path().resolve()}/results"
+
+    if (args.img or args.mask_out) and imwri is None:
         raise GetnativeException("imwri not found.")
 
     if _descale_getnative is None:
@@ -334,8 +338,8 @@ def getnative(args: Union[List, argparse.Namespace], src: vapoursynth.VideoNode,
         print(f"The image height is {src.height}, going higher is stupid! New max_h {src.height}")
         args.max_h = src.height
 
-    getn = GetNative(src, scaler, args.ar, args.min_h, args.max_h, args.frame, args.img_out, args.plot_scaling,
-                     args.plot_format, args.show_plot, args.no_save, args.steps)
+    getn = GetNative(src, scaler, args.ar, args.min_h, args.max_h, args.frame, args.mask_out, args.plot_scaling,
+                     args.plot_format, args.show_plot, args.no_save, args.steps, output_dir)
     try:
         loop = asyncio.get_event_loop()
         best_value, plot, resolutions = loop.run_until_complete(getn.run())
@@ -392,14 +396,14 @@ parser.add_argument('--lanczos-taps', '-t', dest='taps', type=int, default=3, he
 parser.add_argument('--aspect-ratio', '-ar', dest='ar', type=to_float, default=0, help='Force aspect ratio. Only useful for anamorphic input')
 parser.add_argument('--min-height', '-min', dest="min_h", type=int, default=500, help='Minimum height to consider')
 parser.add_argument('--max-height', '-max', dest="max_h", type=int, default=1000, help='Maximum height to consider')
-parser.add_argument('--generate-images', '-img-out', dest='img_out', action="store_true", default=False, help='Save detail mask as png')
+parser.add_argument('--output-mask', '-mask', dest='mask_out', action="store_true", default=False, help='Save detail mask as png')
 parser.add_argument('--plot-scaling', '-ps', dest='plot_scaling', type=str.lower, default='log', help='Scaling of the y axis. Can be "linear" or "log"')
 parser.add_argument('--plot-format', '-pf', dest='plot_format', type=str.lower, default='svg', help='Format of the output image. Specify multiple formats separated by commas. Can be svg, png, pdf, rgba, jp(e)g, tif(f), and probably more')
 parser.add_argument('--show-plot-gui', '-pg', dest='show_plot', action="store_true", default=False, help='Show an interactive plot gui window.')
-parser.add_argument('--no-save', '-ns', dest='no_save', action="store_true", default=False, help='Do not save files to disk.')
+parser.add_argument('--no-save', '-ns', dest='no_save', action="store_true", default=False, help='Do not save files to disk. Disables all output arguments!')
 parser.add_argument('--is-image', '-img', dest='img', action="store_true", default=False, help='Force image input')
 parser.add_argument('--stepping', '-steps', dest='steps', type=int, default=1, help='This changes the way getnative will handle resolutions. Example steps=3 [500p, 503p, 506p ...]')
-parser.add_argument('--output-dir', '-dir', dest='dir', type=str, default=output_dir, help='Sets the path of the output dir where you want all results to be saved')
+parser.add_argument('--output-dir', '-dir', dest='dir', type=str, default="", help='Sets the path of the output dir where you want all results to be saved. (/results will always be added as last folder)')
 def main():
     parser.add_argument(dest='input_file', type=str, help='Absolute or relative path to the input file')
     parser.add_argument('--use', '-u', default=None, help='Use specified source filter e.g. (lsmas.LWLibavSource)')

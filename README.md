@@ -58,6 +58,7 @@ Output Graph:
 | show-plot-gui | Show an interactive plot gui window. | False | Action |
 | no-save | Do not save files to disk. | False | Action |
 | stepping | This changes the way getnative will handle resolutions. Example steps=3 [500p, 503p, 506p ...] | 1 | Int |
+| output-dir | Sets the path of the output dir where you want all results to be saved | (CWD)/results | String |
 
 # CLI Args
 
