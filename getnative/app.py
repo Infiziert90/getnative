@@ -157,7 +157,7 @@ class GetNative:
         vals = []
         full_clip_len = len(full_clip)
         for frame_index in range(len(full_clip)):
-            print(f"{frame_index+1}/{full_clip_len}", end="\r")
+            print(f"\r{frame_index}/{full_clip_len-1}", end="")
             fut = asyncio.ensure_future(asyncio.wrap_future(full_clip.get_frame_async(frame_index)))
             tasks_pending.add(fut)
             futures[fut] = frame_index
@@ -169,6 +169,7 @@ class GetNative:
         vals += [(futures.pop(task), task.result().props.PlaneStatsAverage) for task in tasks_done]
         vals = [v for _, v in sorted(vals)]
         ratios, vals, best_value = self.analyze_results(vals)
+        print("\n")  # move the cursor, so that you not start at the end of the progress bar
 
         self.txt_output += 'Raw data:\nResolution\t | Relative Error\t | Relative difference from last\n'
         self.txt_output += '\n'.join([
@@ -181,6 +182,7 @@ class GetNative:
             if not os.path.isdir(self.output_dir):
                 os.mkdir(self.output_dir)
 
+            print(f"Output Path: {self.output_dir}")
             for fmt in self.plot_format.replace(" ", "").split(','):
                 fig.savefig(f'{self.output_dir}/{self.filename}.{fmt}')
 
@@ -294,10 +296,10 @@ def getnative(args: Union[List, argparse.Namespace], src: vapoursynth.VideoNode,
     if type(args) == list:
         args = parser.parse_args(args)
 
-    output_dir = f"{Path().resolve()}" if args.dir == "" else args.dir
+    output_dir = Path(args.dir).resolve()
     if not os.access(output_dir, os.W_OK):
         raise PermissionError(f"Missing write permissions: {output_dir}")
-    output_dir = f"{Path().resolve()}/results"
+    output_dir = output_dir.joinpath("results")
 
     if (args.img or args.mask_out) and imwri is None:
         raise GetnativeException("imwri not found.")
@@ -348,7 +350,7 @@ def getnative(args: Union[List, argparse.Namespace], src: vapoursynth.VideoNode,
     gc.collect()
     print(
         f"\n{scaler} AR: {args.ar:.2f} Steps: {args.steps}\n"
-        f"{best_value}\n\n"
+        f"{best_value}\n"
     )
 
     return resolutions, plot

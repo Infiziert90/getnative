@@ -2,11 +2,21 @@
 Find the native resolution(s) of upscaled material (mostly anime)
 
 # Usage
-Start with installing the depdencies through `pip`.
+Install it via:
+
+    $ pip install getnative
+    
+Start by executing:
+
+    $ getnative [--args] inputFile
+
+***or***  
+  
+Install all depdencies through `pip`
 
 Start by executing:
 
-    $ python getnative.py inputFile [--args]
+    $ python run_getnative.py [--args] inputFile
 
 That's it.
 
@@ -16,7 +26,7 @@ To run this script you will need:
 
 * Python 3.6
 * [matplotlib](http://matplotlib.org/users/installing.html)
-* [Vapoursynth](http://www.vapoursynth.com) R39+
+* [Vapoursynth](http://www.vapoursynth.com) R45+
 * [descale](https://github.com/Irrational-Encoding-Wizardry/vapoursynth-descale) (really slow for descale but needed for spline64 and lanczos5) 
 and/or [descale_getnative](https://github.com/OrangeChannel/vapoursynth-descale) (perfect for getnative)
 * [ffms2](https://github.com/FFMS/ffms2) or [lsmash](https://github.com/VFR-maniac/L-SMASH-Works) or [imwri](https://forum.doom9.org/showthread.php?t=170981)
@@ -24,20 +34,40 @@ and/or [descale_getnative](https://github.com/OrangeChannel/vapoursynth-descale)
 # Example Output
 Input Command:
 
-    $ python getnative.py /home/infi/mpv-shot0001.png -k bicubic -b 1/3 -c 1/3
+    $ getnative -k bicubic -b 0.11 -c 0.51 -dir "../../Downloads" "../../Downloads/unknown.png"
 
-Output Text:
+Terminal Output:
 ```
 Using imwri as source filter
-501/501
-Kernel: bicubic AR: 1.78 B: 0.33 C: 0.33
-Native resolution(s) (best guess): 720p, 987p
-done in 29.07s
+
+500/500
+
+Output Path: /Users/infi/Downloads/results
+
+Bicubic b 0.11 c 0.51 AR: 1.78 Steps: 1
+Native resolution(s) (best guess): 720p
+
+done in 13.56s
 ```
 
 Output Graph:
 
-![alt text](https://nayu.moe/UavJvs)
+![alt text](https://nayu.moe/OSnWbP)
+
+Output TXT (summary):
+```
+ 715		 | 0.0000501392		 | 1.07
+ 716		 | 0.0000523991		 | 0.96
+ 717		 | 0.0000413640		 | 1.27
+ 718		 | 0.0000593276		 | 0.70
+ 719		 | 0.0000617733		 | 0.96
+ 720		 | 0.0000000342		 | 1805.60
+ 721		 | 0.0000599182		 | 0.00
+ 722		 | 0.0000554626		 | 1.08
+ 723		 | 0.0000413679		 | 1.34
+ 724		 | 0.0000448137		 | 0.92
+ 725		 | 0.0000455203		 | 0.98
+```
 
 # Args
 
@@ -58,7 +88,7 @@ Output Graph:
 | show-plot-gui | Show an interactive plot gui window. | False | Action |
 | no-save | Do not save files to disk. | False | Action |
 | stepping | This changes the way getnative will handle resolutions. Example steps=3 [500p, 503p, 506p ...] | 1 | Int |
-| output-dir | Sets the path of the output dir where you want all results to be saved | (CWD)/results | String |
+| output-dir | Sets the path of the output dir where you want all results to be saved. (/results will always be added as last folder) | (CWD)/results | String |
 
 # CLI Args
 
