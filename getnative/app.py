@@ -1,12 +1,13 @@
 import gc
 import os
 import time
-import argparse
 import asyncio
+import argparse
 import vapoursynth
+from pathlib import Path
 from functools import partial
 from typing import Union, List, Tuple
-from utils import GetnativeException, plugin_from_identifier, get_attr, get_source_filter, to_float
+from getnative.utils import GetnativeException, plugin_from_identifier, get_attr, get_source_filter, to_float
 try:
     import matplotlib as mpl
     import matplotlib.pyplot as pyplot
@@ -19,14 +20,11 @@ except BaseException:
 Rework by Infi
 Original Author: kageru https://gist.github.com/kageru/549e059335d6efbae709e567ed081799
 Thanks: BluBb_mADe, FichteFoll, stux!, Frechdachs, LittlePox
-
-Version: 2.0.0
 """
 
 core = vapoursynth.core
 core.add_cache = False
 imwri = getattr(core, "imwri", getattr(core, "imwrif", None))
-output_dir = os.path.splitext(os.path.basename(__file__))[0]
 _modes = ["bilinear", "bicubic", "bl-bc", "all"]
 _descale = plugin_from_identifier(core, "tegaf.asi.xe")
 if _descale is None:
@@ -52,12 +50,14 @@ class _DefineScaler:
         self.c = c
         self.taps = taps
         self.plugin = _descale_getnative if try_descale_getnative and _descale_getnative is not None else _descale
-        if self.plugin is not None:
-            self.descaler = getattr(self.plugin, f'De{self.kernel}', None)
-            self.upscaler = getattr(core.resize, self.kernel.title())
+        if self.plugin is None:
+            return  # no plugin could be the case for lanczos5 and spline64
 
-            self.check_input()
-            self.check_for_extra_paras()
+        self.descaler = getattr(self.plugin, f'De{self.kernel}', None)
+        self.upscaler = getattr(core.resize, self.kernel.title())
+
+        self.check_input()
+        self.check_for_extra_paras()
 
     def check_for_extra_paras(self):
         if self.kernel == 'bicubic':
@@ -113,8 +113,8 @@ common_scaler = {
 
 
 class GetNative:
-    def __init__(self, src, scaler, ar, min_h, max_h, frame, img_out, plot_scaling, plot_format, show_plot, no_save,
-                 steps):
+    def __init__(self, src, scaler, ar, min_h, max_h, frame, mask_out, plot_scaling, plot_format, show_plot, no_save,
+                 steps, output_dir):
         self.plot_format = plot_format
         self.plot_scaling = plot_scaling
         self.src = src
@@ -123,10 +123,11 @@ class GetNative:
         self.ar = ar
         self.scaler = scaler
         self.frame = frame
-        self.img_out = img_out
+        self.mask_out = mask_out
         self.show_plot = show_plot
         self.no_save = no_save
         self.steps = steps
+        self.output_dir = output_dir
         self.txt_output = ""
         self.resolutions = []
         self.filename = self.get_filename()
@@ -140,15 +141,12 @@ class GetNative:
         src_luma32 = core.std.Cache(src_luma32)
 
         # descale each individual frame
-        descaler = self.scaler.descaler
-        upscaler = self.scaler.upscaler
-        clip_list = []
-        for h in range(self.min_h, self.max_h + 1, self.steps):
-            clip_list.append(descaler(src_luma32, self.getw(h), h))
+        clip_list = [self.scaler.descaler(src_luma32, self.getw(h), h)
+                     for h in range(self.min_h, self.max_h + 1, self.steps)]
         full_clip = core.std.Splice(clip_list, mismatch=True)
-        full_clip = upscaler(full_clip, self.getw(src.height), src.height)
+        full_clip = self.scaler.upscaler(full_clip, self.getw(src.height), src.height)
         if self.ar != src.width / src.height:
-            src_luma32 = upscaler(src_luma32, self.getw(src.height), src.height)
+            src_luma32 = self.scaler.upscaler(src_luma32, self.getw(src.height), src.height)
         expr_full = core.std.Expr([src_luma32 * full_clip.num_frames, full_clip], 'x y - abs dup 0.015 > swap 0 ?')
         full_clip = core.std.CropRel(expr_full, 5, 5, 5, 5)
         full_clip = core.std.PlaneStats(full_clip)
@@ -159,7 +157,7 @@ class GetNative:
         vals = []
         full_clip_len = len(full_clip)
         for frame_index in range(len(full_clip)):
-            print(f"{frame_index+1}/{full_clip_len}", end="\r")
+            print(f"\r{frame_index}/{full_clip_len-1}", end="")
             fut = asyncio.ensure_future(asyncio.wrap_future(full_clip.get_frame_async(frame_index)))
             tasks_pending.add(fut)
             futures[fut] = frame_index
@@ -170,24 +168,29 @@ class GetNative:
         tasks_done, _ = await asyncio.wait(tasks_pending)
         vals += [(futures.pop(task), task.result().props.PlaneStatsAverage) for task in tasks_done]
         vals = [v for _, v in sorted(vals)]
-        ratios, vals, txt_output, best_value = self.analyze_results(vals)
-        if not os.path.isdir(output_dir):
-            os.mkdir(output_dir)
+        ratios, vals, best_value = self.analyze_results(vals)
+        print("\n")  # move the cursor, so that you not start at the end of the progress bar
 
-        plot = self.save_plot(vals)
-        if not self.no_save and self.img_out:
-            self.save_images(src_luma32)
-
-        txt_output += 'Raw data:\nResolution\t | Relative Error\t | Relative difference from last\n'
-        txt_output += '\n'.join([
+        self.txt_output += 'Raw data:\nResolution\t | Relative Error\t | Relative difference from last\n'
+        self.txt_output += '\n'.join([
             f'{i * self.steps + self.min_h:4d}\t\t | {error:.10f}\t\t | {ratios[i]:.2f}'
             for i, error in enumerate(vals)
         ])
-        self.txt_output = txt_output  # if anyone needs this later
 
+        plot, fig = self.save_plot(vals)
         if not self.no_save:
-            with open(f"{output_dir}/{self.filename}.txt", "w") as stream:
-                stream.writelines(txt_output)
+            if not os.path.isdir(self.output_dir):
+                os.mkdir(self.output_dir)
+
+            print(f"Output Path: {self.output_dir}")
+            for fmt in self.plot_format.replace(" ", "").split(','):
+                fig.savefig(f'{self.output_dir}/{self.filename}.{fmt}')
+
+            with open(f"{self.output_dir}/{self.filename}.txt", "w") as stream:
+                stream.writelines(self.txt_output)
+
+            if self.mask_out:
+                self.save_images(src_luma32)
 
         return best_value, plot, self.resolutions
 
@@ -223,13 +226,13 @@ class GetNative:
             f"Native resolution(s) (best guess): "
             f"{'p, '.join([str(r * self.steps + self.min_h) for r in self.resolutions])}p"
         )
-        txt_output = (
+        self.txt_output = (
             f"Resize Kernel: {self.scaler}\n"
             f"{best_values}\n"
             f"Please check the graph manually for more accurate results\n\n"
         )
 
-        return ratios, vals, txt_output, best_values
+        return ratios, vals, best_values
 
     # Modified from:
     # https://github.com/WolframRhodium/muvsfunc/blob/d5b2c499d1b71b7689f086cd992d9fb1ccb0219e/muvsfunc.py#L5807
@@ -242,13 +245,10 @@ class GetNative:
         dh_sequence = tuple(range(500, 1001, self.steps))
         ticks = tuple(dh for i, dh in enumerate(dh_sequence) if i % (50 // self.steps) == 0)
         ax.set(xlabel="Height", xticks=ticks, ylabel="Relative error", title=self.filename, yscale="log")
-        if not self.no_save:
-            for fmt in self.plot_format.replace(" ", "").split(','):
-                fig.savefig(f'{output_dir}/{self.filename}.{fmt}')
         if self.show_plot:
             plot.show()
 
-        return plot
+        return plot, fig
 
     # Original idea by Chibi_goku http://recensubshq.forumfree.it/?t=64839203
     # Vapoursynth port by MonoS @github: https://github.com/MonoS/VS-MaskDetail
@@ -262,15 +262,15 @@ class GetNative:
 
     def save_images(self, src_luma32):
         src = src_luma32
-        first_out = imwri.Write(src, 'png', f'{output_dir}/{self.filename}_source%d.png')
+        first_out = imwri.Write(src, 'png', f'{self.output_dir}/{self.filename}_source%d.png')
         first_out.get_frame(0)  # trick vapoursynth into rendering the frame
         for r in self.resolutions:
-            r += self.min_h
+            r = r * self.steps + self.min_h
             image = self.mask_detail(src, self.getw(r), r)
-            mask_out = imwri.Write(image, 'png', f'{output_dir}/{self.filename}_mask_{r:d}p%d.png')
+            mask_out = imwri.Write(image, 'png', f'{self.output_dir}/{self.filename}_mask_{r:d}p%d.png')
             mask_out.get_frame(0)
             descale_out = self.scaler.descaler(src, self.getw(r), r)
-            descale_out = imwri.Write(descale_out, 'png', f'{output_dir}/{self.filename}_{r:d}p%d.png')
+            descale_out = imwri.Write(descale_out, 'png', f'{self.output_dir}/{self.filename}_{r:d}p%d.png')
             descale_out.get_frame(0)
 
     def get_filename(self):
@@ -296,7 +296,12 @@ def getnative(args: Union[List, argparse.Namespace], src: vapoursynth.VideoNode,
     if type(args) == list:
         args = parser.parse_args(args)
 
-    if (args.img or args.img_out) and imwri is None:
+    output_dir = Path(args.dir).resolve()
+    if not os.access(output_dir, os.W_OK):
+        raise PermissionError(f"Missing write permissions: {output_dir}")
+    output_dir = output_dir.joinpath("results")
+
+    if (args.img or args.mask_out) and imwri is None:
         raise GetnativeException("imwri not found.")
 
     if _descale_getnative is None:
@@ -334,20 +339,19 @@ def getnative(args: Union[List, argparse.Namespace], src: vapoursynth.VideoNode,
         print(f"The image height is {src.height}, going higher is stupid! New max_h {src.height}")
         args.max_h = src.height
 
-    getn = GetNative(src, scaler, args.ar, args.min_h, args.max_h, args.frame, args.img_out, args.plot_scaling,
-                     args.plot_format, args.show_plot, args.no_save, args.steps)
+    getn = GetNative(src, scaler, args.ar, args.min_h, args.max_h, args.frame, args.mask_out, args.plot_scaling,
+                     args.plot_format, args.show_plot, args.no_save, args.steps, output_dir)
     try:
         loop = asyncio.get_event_loop()
         best_value, plot, resolutions = loop.run_until_complete(getn.run())
     except ValueError as err:
         raise GetnativeException(f"Error in getnative: {err}")
 
-    content = (
-        f"\n{scaler} AR: {args.ar:.2f} Steps: {args.steps}\n"
-        f"{best_value}\n\n"
-    )
     gc.collect()
-    print(content)
+    print(
+        f"\n{scaler} AR: {args.ar:.2f} Steps: {args.steps}\n"
+        f"{best_value}\n"
+    )
 
     return resolutions, plot
 
@@ -378,7 +382,7 @@ def _getnative():
 
     for i, scaler in enumerate(mode):
         if scaler is not None and scaler.plugin is None:
-            print(f"No correct descale version found for {scaler}, continuing with next scaler when available.")
+            print(f"Warning: No correct descale version found for {scaler}, continuing with next scaler when available.")
             continue
         getnative(args, src, scaler, first_time=True if i == 0 else False)
 
@@ -392,18 +396,18 @@ parser.add_argument('--lanczos-taps', '-t', dest='taps', type=int, default=3, he
 parser.add_argument('--aspect-ratio', '-ar', dest='ar', type=to_float, default=0, help='Force aspect ratio. Only useful for anamorphic input')
 parser.add_argument('--min-height', '-min', dest="min_h", type=int, default=500, help='Minimum height to consider')
 parser.add_argument('--max-height', '-max', dest="max_h", type=int, default=1000, help='Maximum height to consider')
-parser.add_argument('--generate-images', '-img-out', dest='img_out', action="store_true", default=False, help='Save detail mask as png')
+parser.add_argument('--output-mask', '-mask', dest='mask_out', action="store_true", default=False, help='Save detail mask as png')
 parser.add_argument('--plot-scaling', '-ps', dest='plot_scaling', type=str.lower, default='log', help='Scaling of the y axis. Can be "linear" or "log"')
 parser.add_argument('--plot-format', '-pf', dest='plot_format', type=str.lower, default='svg', help='Format of the output image. Specify multiple formats separated by commas. Can be svg, png, pdf, rgba, jp(e)g, tif(f), and probably more')
 parser.add_argument('--show-plot-gui', '-pg', dest='show_plot', action="store_true", default=False, help='Show an interactive plot gui window.')
-parser.add_argument('--no-save', '-ns', dest='no_save', action="store_true", default=False, help='Do not save files to disk.')
+parser.add_argument('--no-save', '-ns', dest='no_save', action="store_true", default=False, help='Do not save files to disk. Disables all output arguments!')
 parser.add_argument('--is-image', '-img', dest='img', action="store_true", default=False, help='Force image input')
 parser.add_argument('--stepping', '-steps', dest='steps', type=int, default=1, help='This changes the way getnative will handle resolutions. Example steps=3 [500p, 503p, 506p ...]')
-if __name__ == '__main__':
+parser.add_argument('--output-dir', '-dir', dest='dir', type=str, default="", help='Sets the path of the output dir where you want all results to be saved. (/results will always be added as last folder)')
+def main():
     parser.add_argument(dest='input_file', type=str, help='Absolute or relative path to the input file')
     parser.add_argument('--use', '-u', default=None, help='Use specified source filter e.g. (lsmas.LWLibavSource)')
     parser.add_argument('--mode', '-m', dest='mode', type=str, choices=_modes, default=None, help='Choose a predefined mode ["bilinear", "bicubic", "bl-bc", "all"]')
-
     starttime = time.time()
     _getnative()
     print(f'done in {time.time() - starttime:.2f}s')
