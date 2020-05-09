@@ -1,12 +1,13 @@
 import gc
 import os
 import time
-import argparse
 import asyncio
+import argparse
 import vapoursynth
+from pathlib import Path
 from functools import partial
 from typing import Union, List, Tuple
-from utils import GetnativeException, plugin_from_identifier, get_attr, get_source_filter, to_float
+from getnative.utils import GetnativeException, plugin_from_identifier, get_attr, get_source_filter, to_float
 try:
     import matplotlib as mpl
     import matplotlib.pyplot as pyplot
@@ -19,14 +20,13 @@ except BaseException:
 Rework by Infi
 Original Author: kageru https://gist.github.com/kageru/549e059335d6efbae709e567ed081799
 Thanks: BluBb_mADe, FichteFoll, stux!, Frechdachs, LittlePox
-
-Version: 2.0.0
 """
 
 core = vapoursynth.core
 core.add_cache = False
 imwri = getattr(core, "imwri", getattr(core, "imwrif", None))
-output_dir = os.path.splitext(os.path.basename(__file__))[0]
+parent_dir = Path(__file__).resolve().parents[1]
+output_dir = f"{parent_dir}/results"
 _modes = ["bilinear", "bicubic", "bl-bc", "all"]
 _descale = plugin_from_identifier(core, "tegaf.asi.xe")
 if _descale is None:
@@ -399,11 +399,11 @@ parser.add_argument('--show-plot-gui', '-pg', dest='show_plot', action="store_tr
 parser.add_argument('--no-save', '-ns', dest='no_save', action="store_true", default=False, help='Do not save files to disk.')
 parser.add_argument('--is-image', '-img', dest='img', action="store_true", default=False, help='Force image input')
 parser.add_argument('--stepping', '-steps', dest='steps', type=int, default=1, help='This changes the way getnative will handle resolutions. Example steps=3 [500p, 503p, 506p ...]')
-if __name__ == '__main__':
+parser.add_argument('--output-dir', '-dir', dest='dir', type=str, default=output_dir, help='Sets the path of the output dir where you want all results to be saved')
+def main():
     parser.add_argument(dest='input_file', type=str, help='Absolute or relative path to the input file')
     parser.add_argument('--use', '-u', default=None, help='Use specified source filter e.g. (lsmas.LWLibavSource)')
     parser.add_argument('--mode', '-m', dest='mode', type=str, choices=_modes, default=None, help='Choose a predefined mode ["bilinear", "bicubic", "bl-bc", "all"]')
-
     starttime = time.time()
     _getnative()
     print(f'done in {time.time() - starttime:.2f}s')
