@@ -9,6 +9,14 @@ Install it via:
 Start by executing:
 
     $ getnative [--args] inputFile
+    
+If `getnative` could not be found, try executing this:
+
+    # Linux
+    $ python -m getnative [--args] inputFile
+    
+    # Windows
+    $ py -3 -m getnative [--args] inputFile
 
 ***or***  
   
@@ -16,7 +24,7 @@ Install all depdencies through `pip`
 
 Start by executing:
 
-    $ python run_getnative.py [--args] inputFile
+    $ python -m getnative [--args] inputFile
 
 That's it.
 
