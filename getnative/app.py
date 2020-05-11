@@ -26,15 +26,10 @@ core = vapoursynth.core
 core.add_cache = False
 imwri = getattr(core, "imwri", getattr(core, "imwrif", None))
 _modes = ["bilinear", "bicubic", "bl-bc", "all"]
-_descale = plugin_from_identifier(core, "tegaf.asi.xe")
-if _descale is None:
-    _descale = get_attr(core, 'descale', None)  # try finding a descale that not uses the original identifier
-_descale_getnative = plugin_from_identifier(core, "toggaf.asi.xe")
 
 
 class _DefineScaler:
-    def __init__(self, kernel: str, b: Union[float, int] = 0, c: Union[float, int] = 0, taps: int = 0,
-                 try_descale_getnative: bool = True):
+    def __init__(self, kernel: str, b: Union[float, int] = 0, c: Union[float, int] = 0, taps: int = 0):
         """
         Get a scaler for getnative from descale
 
@@ -42,16 +37,16 @@ class _DefineScaler:
         :param b: b value for kernel "bicubic" (default 0)
         :param c: c value for kernel "bicubic" (default 0)
         :param taps: taps value for kernel "lanczos" (default 0)
-        :param try_descale_getnative: prioritize using descale_getnative when available
         """
 
         self.kernel = kernel
         self.b = b
         self.c = c
         self.taps = taps
-        self.plugin = _descale_getnative if try_descale_getnative and _descale_getnative is not None else _descale
+        _d = plugin_from_identifier(core, "tegaf.asi.xe")
+        self.plugin = _d if _d is not None else get_attr(core, 'descale', None)
         if self.plugin is None:
-            return  # no plugin could be the case for lanczos5 and spline64
+            return
 
         self.descaler = getattr(self.plugin, f'De{self.kernel}', None)
         self.upscaler = getattr(core.resize, self.kernel.title())
@@ -102,12 +97,12 @@ common_scaler = {
         _DefineScaler("lanczos", taps=2),
         _DefineScaler("lanczos", taps=3),
         _DefineScaler("lanczos", taps=4),
-        _DefineScaler("lanczos", taps=5, try_descale_getnative=False),  # taps5 is crashing descale_getnative
+        _DefineScaler("lanczos", taps=5),
     ],
     "spline": [
         _DefineScaler("spline16"),
         _DefineScaler("spline36"),
-        _DefineScaler("spline64", try_descale_getnative=False),  # not available for descale_getnative
+        _DefineScaler("spline64"),
     ]
 }
 
@@ -304,22 +299,21 @@ def getnative(args: Union[List, argparse.Namespace], src: vapoursynth.VideoNode,
     if (args.img or args.mask_out) and imwri is None:
         raise GetnativeException("imwri not found.")
 
-    if _descale_getnative is None:
-        if _descale is None:
-            raise GetnativeException('No descale found!')
-        if first_time:
-            print("Warning: Only the really really slow descale is available. (See README for help)\n")
+    if scaler is None:
+        scaler = _DefineScaler(args.kernel, b=args.b, c=args.c, taps=args.taps)
+    else:
+        scaler = scaler
+
+    if scaler.plugin is None:
+        if "toggaf.asi.xe" in core.get_plugins():
+            print("Error: descale_getnative support ended, pls use https://github.com/Irrational-Encoding-Wizardry/vapoursynth-descale")
+        raise GetnativeException('No descale found!')
 
     if args.steps != 1 and first_time:
         print(
             "Warning for -steps/--stepping: "
             "If you are not completely sure what this parameter does, use the default step size.\n"
         )
-
-    if scaler is None:
-        scaler = _DefineScaler(args.kernel, b=args.b, c=args.c, taps=args.taps)
-    else:
-        scaler = scaler
 
     if args.frame is None:
         args.frame = src.num_frames // 3

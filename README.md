@@ -35,9 +35,8 @@ To run this script you will need:
 * Python 3.6
 * [matplotlib](http://matplotlib.org/users/installing.html)
 * [Vapoursynth](http://www.vapoursynth.com) R45+
-* [descale](https://github.com/Irrational-Encoding-Wizardry/vapoursynth-descale) (really slow for descale but needed for spline64 and lanczos5) 
-and/or [descale_getnative](https://github.com/OrangeChannel/vapoursynth-descale) (perfect for getnative)
-* [ffms2](https://github.com/FFMS/ffms2) or [lsmash](https://github.com/VFR-maniac/L-SMASH-Works) or [imwri](https://forum.doom9.org/showthread.php?t=170981)
+* [descale](https://github.com/Irrational-Encoding-Wizardry/vapoursynth-descale)
+* [ffms2](https://github.com/FFMS/ffms2) **or** [lsmash](https://github.com/VFR-maniac/L-SMASH-Works) **or** [imwri](https://forum.doom9.org/showthread.php?t=170981)
 
 # Example Output
 Input Command:
@@ -60,7 +59,7 @@ done in 13.56s
 
 Output Graph:
 
-![alt text](https://nayu.moe/OSnWbP)
+![alt text](https://nayu.moe/rIimgA)
 
 Output TXT (summary):
 ```

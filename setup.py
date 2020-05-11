@@ -10,7 +10,7 @@ with open("requirements.txt") as fh:
 
 setup(
     name="getnative",
-    version='2.1.0',
+    version='2.2.0',
     description='Find the native resolution(s) of upscaled material (mostly anime)',
     long_description=long_description,
     long_description_content_type="text/markdown",
