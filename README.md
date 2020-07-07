@@ -2,10 +2,6 @@
 Find the native resolution(s) of upscaled material (mostly anime)
 
 # Usage
-Install it via:
-
-    $ pip install getnative
-    
 Start by executing:
 
     $ getnative [--args] inputFile
@@ -19,8 +15,6 @@ If `getnative` could not be found, try executing this:
     $ py -3 -m getnative [--args] inputFile
 
 ***or***  
-  
-Install all depdencies through `pip`
 
 Start by executing:
 
@@ -36,9 +30,20 @@ To run this script you will need:
 * [matplotlib](http://matplotlib.org/users/installing.html)
 * [Vapoursynth](http://www.vapoursynth.com) R45+
 * [descale](https://github.com/Irrational-Encoding-Wizardry/vapoursynth-descale)
-* [ffms2](https://github.com/FFMS/ffms2) **or** [lsmash](https://github.com/VFR-maniac/L-SMASH-Works) **or** [imwri](https://forum.doom9.org/showthread.php?t=170981) (imwri is included with Vapoursynth)
+* [ffms2](https://github.com/FFMS/ffms2) **or** [lsmash](https://github.com/VFR-maniac/L-SMASH-Works) **or** [imwri](https://forum.doom9.org/showthread.php?t=170981)  
+ \*imwri: ImageMagick7 is required for macOS and Linux 
 
 #### Installation
+Install it via:
+
+    $ pip install getnative
+
+**or**
+
+* Download all files from github  
+* Install all dependencies through `pip install -r requirements.txt`  
+
+#### Recommended Windows Installation
 
 Install these programs from their websites:
 
