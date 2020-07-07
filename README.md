@@ -36,7 +36,23 @@ To run this script you will need:
 * [matplotlib](http://matplotlib.org/users/installing.html)
 * [Vapoursynth](http://www.vapoursynth.com) R45+
 * [descale](https://github.com/Irrational-Encoding-Wizardry/vapoursynth-descale)
-* [ffms2](https://github.com/FFMS/ffms2) **or** [lsmash](https://github.com/VFR-maniac/L-SMASH-Works) **or** [imwri](https://forum.doom9.org/showthread.php?t=170981)
+* [ffms2](https://github.com/FFMS/ffms2) **or** [lsmash](https://github.com/VFR-maniac/L-SMASH-Works) **or** [imwri](https://forum.doom9.org/showthread.php?t=170981) (imwri is included with Vapoursynth)
+
+#### Installation
+
+Install these programs from their websites:
+
+* [Vapoursynth](http://www.vapoursynth.com) (includes imwri)
+
+Once Vapoursynth is installed:
+
+    vsrepo.py install descale
+    vsrepo.py install ffms2
+    vsrepo.py install lsmas
+
+Install getnative (and Python dependencies):
+
+    pip install getnative
 
 # Example Output
 Input Command:
