@@ -63,7 +63,9 @@ class _DefineScaler:
             self.upscaler = partial(self.upscaler, filter_param_a=self.taps)
 
     def check_input(self):
-        if self.descaler is None:
+        if self.descaler is None and self.kernel == "spline64":
+            raise GetnativeException(f'descale: spline64 support is missing, update descale (>r3).')
+        elif self.descaler is None:
             raise GetnativeException(f'descale: {self.kernel} is not a supported kernel.')
 
     def __str__(self):
