@@ -239,8 +239,8 @@ class GetNative:
         plot.style.use('dark_background')
         fig, ax = plot.subplots(figsize=(12, 8))
         ax.plot(range(self.min_h, self.max_h + 1, self.steps), vals, '.w-')
-        dh_sequence = tuple(range(500, 1001, self.steps))
-        ticks = tuple(dh for i, dh in enumerate(dh_sequence) if i % (50 // self.steps) == 0)
+        dh_sequence = tuple(range(self.min_h, self.max_h + 1, self.steps))
+        ticks = tuple(dh for i, dh in enumerate(dh_sequence) if i % ((self.max_h - self.min_h + 10 * self.steps - 1) // (10 * self.steps)) == 0)
         ax.set(xlabel="Height", xticks=ticks, ylabel="Relative error", title=self.filename, yscale="log")
         if self.show_plot:
             plot.show()
