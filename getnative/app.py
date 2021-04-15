@@ -279,8 +279,8 @@ class GetNative:
         )
 
 
-def getnative(args: Union[List, argparse.Namespace], src: vapoursynth.VideoNode, scaler: Union[_DefineScaler, None],
-              first_time: bool = True) -> Tuple[List, pyplot.plot]:
+async def getnative(args: Union[List, argparse.Namespace], src: vapoursynth.VideoNode, scaler: Union[_DefineScaler, None],
+              first_time: bool = True) -> Tuple[str, pyplot.plot, GetNative]:
     """
     Process your VideoNode with the getnative algorithm and return the result and a plot object
 
@@ -288,8 +288,9 @@ def getnative(args: Union[List, argparse.Namespace], src: vapoursynth.VideoNode,
     :param src: VideoNode from vapoursynth
     :param scaler: DefineScaler object or None
     :param first_time: prevents posting warnings multiple times
-    :return: best resolutions list and plot matplotlib.pyplot
+    :return: best resolutions string, plot matplotlib.pyplot and GetNative class object
     """
+    
     if type(args) == list:
         args = parser.parse_args(args)
 
@@ -338,8 +339,7 @@ def getnative(args: Union[List, argparse.Namespace], src: vapoursynth.VideoNode,
     getn = GetNative(src, scaler, args.ar, args.min_h, args.max_h, args.frame, args.mask_out, args.plot_scaling,
                      args.plot_format, args.show_plot, args.no_save, args.steps, output_dir)
     try:
-        loop = asyncio.get_event_loop()
-        best_value, plot, resolutions = loop.run_until_complete(getn.run())
+        best_value, plot, resolutions = await getn.run()
     except ValueError as err:
         raise GetnativeException(f"Error in getnative: {err}")
 
@@ -349,7 +349,7 @@ def getnative(args: Union[List, argparse.Namespace], src: vapoursynth.VideoNode,
         f"{best_value}\n"
     )
 
-    return resolutions, plot
+    return best_value, plot, getn
 
 
 def _getnative():
@@ -376,11 +376,14 @@ def _getnative():
     elif args.mode == "all":
         mode = [s for scaler in common_scaler.values() for s in scaler]
 
+    loop = asyncio.get_event_loop()
     for i, scaler in enumerate(mode):
         if scaler is not None and scaler.plugin is None:
             print(f"Warning: No correct descale version found for {scaler}, continuing with next scaler when available.")
             continue
-        getnative(args, src, scaler, first_time=True if i == 0 else False)
+        loop.run_until_complete(
+            getnative(args, src, scaler, first_time=True if i == 0 else False)
+        )
 
 
 parser = argparse.ArgumentParser(description='Find the native resolution(s) of upscaled material (mostly anime)')
