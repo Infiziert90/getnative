@@ -38,14 +38,14 @@ def get_source_filter(core, imwri, args):
     if ext in {".py", ".pyw", ".vpy"}:
         print("Using custom VapourSynth script as a source. This may cause garbage results. Only do this if you know what you are doing.")
         return vpy_source_filter
-    source_filter = get_attr(core, 'ffms2.Source')
-    if source_filter:
-        print("Using ffms2 as source filter")
-        return lambda input_file: source_filter(input_file, alpha=False)
     source_filter = get_attr(core, 'lsmas.LWLibavSource')
     if source_filter:
         print("Using lsmas.LWLibavSource as source filter")
         return source_filter
+    source_filter = get_attr(core, 'ffms2.Source')
+    if source_filter:
+        print("Using ffms2 as source filter")
+        return lambda input_file: source_filter(input_file, alpha=False)
     source_filter = get_attr(core, 'lsmas.LSMASHVideoSource')
     if source_filter:
         print("Using lsmas.LSMASHVideoSource as source filter")
