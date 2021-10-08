@@ -90,6 +90,7 @@ common_scaler = {
         _DefineScaler("bicubic", b=1 / 3, c=1 / 3),
         _DefineScaler("bicubic", b=.5, c=0),
         _DefineScaler("bicubic", b=0, c=.5),
+        _DefineScaler("bicubic", b=0, c=.75),
         _DefineScaler("bicubic", b=1, c=0),
         _DefineScaler("bicubic", b=0, c=1),
         _DefineScaler("bicubic", b=.2, c=.5),
