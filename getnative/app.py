@@ -23,7 +23,8 @@ Thanks: BluBb_mADe, FichteFoll, stux!, Frechdachs, LittlePox
 """
 
 core = vapoursynth.core
-core.add_cache = False
+if core.version_number() < 55:
+    core.add_cache = False
 imwri = getattr(core, "imwri", getattr(core, "imwrif", None))
 _modes = ["bilinear", "bicubic", "bl-bc", "all"]
 
@@ -290,7 +291,7 @@ async def getnative(args: Union[List, argparse.Namespace], src: vapoursynth.Vide
     :param first_time: prevents posting warnings multiple times
     :return: best resolutions string, plot matplotlib.pyplot and GetNative class object
     """
-    
+
     if type(args) == list:
         args = parser.parse_args(args)
 
