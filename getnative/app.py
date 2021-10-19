@@ -139,12 +139,12 @@ class GetNative:
         src_luma32 = core.std.Cache(src_luma32)
 
         # descale each individual frame
-        clip_list = [self.scaler.descaler(src_luma32, self.getw(h), h)
+        clip_list = [self.scaler.descaler(src_luma32, self.getw(h, not src.width&1), h) # allow odd resolutions for odd input
                      for h in range(self.min_h, self.max_h + 1, self.steps)]
         full_clip = core.std.Splice(clip_list, mismatch=True)
-        full_clip = self.scaler.upscaler(full_clip, self.getw(src.height), src.height)
+        full_clip = self.scaler.upscaler(full_clip, src.width, src.height)
         if self.ar != src.width / src.height:
-            src_luma32 = self.scaler.upscaler(src_luma32, self.getw(src.height), src.height)
+            src_luma32 = self.scaler.upscaler(src_luma32, src.width, src.height)
         expr_full = core.std.Expr([src_luma32 * full_clip.num_frames, full_clip], 'x y - abs dup 0.015 > swap 0 ?')
         full_clip = core.std.CropRel(expr_full, 5, 5, 5, 5)
         full_clip = core.std.PlaneStats(full_clip)

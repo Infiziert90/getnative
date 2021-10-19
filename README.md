@@ -141,4 +141,4 @@ BluBb_mADe, kageru, FichteFoll, stux!, LittlePox
 
 # Help?
 
-Join https://discord.gg/V5vaWwr (Ask in #encode-autism for help)
+Join https://discord.gg/3DYaV47 (Ask in #encode-autism for help)
