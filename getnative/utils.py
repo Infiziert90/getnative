@@ -27,7 +27,10 @@ def plugin_from_identifier(core: vapoursynth.Core, identifier: str) -> Union[Cal
 def vpy_source_filter(path):
     import runpy
     runpy.run_path(path, {}, "__vapoursynth__")
-    return vapoursynth.get_output(0)
+    if vapoursynth.core.version_number() < 55:
+        return vapoursynth.get_output(0)
+    else:
+        return vapoursynth.get_output(0)[0]
 
 
 def get_source_filter(core, imwri, args):
