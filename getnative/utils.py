@@ -1,14 +1,14 @@
 import os
 import argparse
 import vapoursynth
-from typing import Union, Callable
+from typing import Union
 
 
 class GetnativeException(BaseException):
     pass
 
 
-def plugin_from_identifier(core: vapoursynth.Core, identifier: str) -> Union[Callable, None]:
+def plugin_from_identifier(core: vapoursynth.Core, identifier: str) -> Union[vapoursynth.Plugin, None]:
     """
     Get a plugin from vapoursynth with only the plugin identifier
 
@@ -17,11 +17,10 @@ def plugin_from_identifier(core: vapoursynth.Core, identifier: str) -> Union[Cal
     :return Plugin or None
     """
 
-    return getattr(
-        core,
-        core.get_plugins().get(identifier, {}).get("namespace", ""),
-        None
-    )
+    if core.version_number() >= 60:
+        return next((plugin for plugin in core.plugins() if plugin.identifier == identifier), None)
+
+    return getattr(core, core.get_plugins().get(identifier, {}).get("namespace", ""), None)  # type: ignore
 
 
 def vpy_source_filter(path):
