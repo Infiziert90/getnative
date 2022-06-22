@@ -309,8 +309,6 @@ async def getnative(args: Union[List, argparse.Namespace], src: vapoursynth.Vide
         scaler = scaler
 
     if scaler.plugin is None:
-        if "toggaf.asi.xe" in core.get_plugins():
-            print("Error: descale_getnative support ended, pls use https://github.com/Irrational-Encoding-Wizardry/vapoursynth-descale")
         raise GetnativeException('No descale found!')
 
     if args.steps != 1 and first_time:
