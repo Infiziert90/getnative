@@ -62,7 +62,7 @@ Install getnative (and Python dependencies):
 # Example Output
 Input Command:
 
-    $ getnative -k bicubic -b 0.11 -c 0.51 -dir "../../Downloads" "../../Downloads/unknown.png"
+    $ getnative -k bicubic -b 0.33 -c 0.33 -dir "../../Downloads" "../../Downloads/unknown.png"
 
 Terminal Output:
 ```
@@ -72,29 +72,29 @@ Using imwri as source filter
 
 Output Path: /Users/infi/Downloads/results
 
-Bicubic b 0.11 c 0.51 AR: 1.78 Steps: 1
-Native resolution(s) (best guess): 720p
+Bicubic b 0.33 c 0.33 AR: 1.78 Steps: 1
+Native resolution(s) (best guess): 873p
 
 done in 13.56s
 ```
 
 Output Graph:
 
-![alt text](https://nayu.moe/rIimgA)
+![alt text](examples/f_0_Bicubic_b_0.33_c_0.33_ar_1.78_steps_1.png)
 
 Output TXT (summary):
 ```
- 715		 | 0.0000501392		 | 1.07
- 716		 | 0.0000523991		 | 0.96
- 717		 | 0.0000413640		 | 1.27
- 718		 | 0.0000593276		 | 0.70
- 719		 | 0.0000617733		 | 0.96
- 720		 | 0.0000000342		 | 1805.60
- 721		 | 0.0000599182		 | 0.00
- 722		 | 0.0000554626		 | 1.08
- 723		 | 0.0000413679		 | 1.34
- 724		 | 0.0000448137		 | 0.92
- 725		 | 0.0000455203		 | 0.98
+ 868		 | 0.0000863251		 | 0.93
+ 869		 | 0.0000828592		 | 1.04
+ 870		 | 0.0000734709		 | 1.13
+ 871		 | 0.0000555885		 | 1.32
+ 872		 | 0.0000596791		 | 0.93
+ 873		 | 0.0000011579		 | 51.54
+ 874		 | 0.0000385670		 | 0.03
+ 875		 | 0.0000433674		 | 0.89
+ 876		 | 0.0000548476		 | 0.79
+ 877		 | 0.0000614557		 | 0.89
+ 878		 | 0.0000740702		 | 0.83
 ```
 
 # Args
@@ -141,4 +141,4 @@ BluBb_mADe, kageru, FichteFoll, stux!, LittlePox
 
 # Help?
 
-Join https://discord.gg/3DYaV47 (Ask in #encode-autism for help)
+Join https://discord.gg/UERrfucRFD (Ask in #encode-autism for help)
