@@ -7,7 +7,7 @@ import vapoursynth
 from pathlib import Path
 from functools import partial
 from typing import Union, List, Tuple
-from getnative.utils import GetnativeException, plugin_from_identifier, get_attr, get_source_filter, to_float
+from getnative.utils import GetnativeException, get_attr, get_source_filter, to_float
 try:
     import matplotlib as mpl
     import matplotlib.pyplot as pyplot
@@ -44,8 +44,7 @@ class _DefineScaler:
         self.b = b
         self.c = c
         self.taps = taps
-        _d = plugin_from_identifier(core, "tegaf.asi.xe")
-        self.plugin = _d if _d is not None else get_attr(core, 'descale', None)
+        self.plugin = get_attr(core, 'descale', None)
         if self.plugin is None:
             return
 

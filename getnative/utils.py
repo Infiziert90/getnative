@@ -1,27 +1,10 @@
 import os
 import argparse
 import vapoursynth
-from typing import Union, Callable
 
 
 class GetnativeException(BaseException):
     pass
-
-
-def plugin_from_identifier(core: vapoursynth.Core, identifier: str) -> Union[Callable, None]:
-    """
-    Get a plugin from vapoursynth with only the plugin identifier
-
-    :param core: the core from vapoursynth
-    :param identifier: plugin identifier. Example "tegaf.asi.xe"
-    :return Plugin or None
-    """
-
-    return getattr(
-        core,
-        core.get_plugins().get(identifier, {}).get("namespace", ""),
-        None
-    )
 
 
 def vpy_source_filter(path):
