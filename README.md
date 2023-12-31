@@ -34,14 +34,14 @@ To run this script you will need:
  \*imwri: ImageMagick7 is required for macOS and Linux 
 
 #### Installation
-Install it via:
+After installing the above prerequisites, install the project via:
 
     $ pip install getnative
 
 **or**
 
 * Download all files from github  
-* Install all dependencies through `pip install -r requirements.txt`  
+* Install all Python dependencies through `pip install -r requirements.txt`  
 
 #### Recommended Windows Installation
 
