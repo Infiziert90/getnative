@@ -1,2 +1,2 @@
 matplotlib>=2.0.0
-VapourSynth>=55
+VapourSynth>=71

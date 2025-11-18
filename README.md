@@ -28,7 +28,7 @@ To run this script you will need:
 
 * Python 3.6
 * [matplotlib](http://matplotlib.org/users/installing.html)
-* [Vapoursynth](http://www.vapoursynth.com) R45+
+* [Vapoursynth](http://www.vapoursynth.com) R71+
 * [descale](https://github.com/Irrational-Encoding-Wizardry/vapoursynth-descale)
 * [ffms2](https://github.com/FFMS/ffms2) **or** [lsmash](https://github.com/VFR-maniac/L-SMASH-Works) **or** [imwri](https://forum.doom9.org/showthread.php?t=170981)  
  \*imwri: ImageMagick7 is required for macOS and Linux 

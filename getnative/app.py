@@ -1,5 +1,6 @@
 import gc
 import os
+import sys
 import time
 import asyncio
 import argparse
@@ -23,8 +24,6 @@ Thanks: BluBb_mADe, FichteFoll, stux!, Frechdachs, LittlePox
 """
 
 core = vapoursynth.core
-if core.version_number() < 55:
-    core.add_cache = False
 imwri = getattr(core, "imwri", getattr(core, "imwrif", None))
 _modes = ["bilinear", "bicubic", "bl-bc", "all"]
 
@@ -111,8 +110,7 @@ common_scaler = {
 
 
 class GetNative:
-    def __init__(self, src, scaler, ar, min_h, max_h, frame, mask_out, plot_scaling, plot_format, show_plot, no_save,
-                 steps, output_dir):
+    def __init__(self, src, scaler, ar, min_h, max_h, frame, mask_out, plot_scaling, plot_format, show_plot, no_save, steps, output_dir):
         self.plot_format = plot_format
         self.plot_scaling = plot_scaling
         self.src = src
@@ -136,10 +134,9 @@ class GetNative:
         matrix_s = '709' if src.format.color_family == vapoursynth.RGB else None
         src_luma32 = core.resize.Point(src, format=vapoursynth.YUV444PS, matrix_s=matrix_s)
         src_luma32 = core.std.ShufflePlanes(src_luma32, 0, vapoursynth.GRAY)
-        src_luma32 = core.std.Cache(src_luma32)
 
         # descale each individual frame
-        clip_list = [self.scaler.descaler(src_luma32, self.getw(h, not src.width&1), h) # allow odd resolutions for odd input
+        clip_list = [self.scaler.descaler(src_luma32, self.getw(h, not src.width & 1), h) # allow odd resolutions for odd input
                      for h in range(self.min_h, self.max_h + 1, self.steps)]
         full_clip = core.std.Splice(clip_list, mismatch=True)
         full_clip = self.scaler.upscaler(full_clip, src.width, src.height)
@@ -148,14 +145,13 @@ class GetNative:
         expr_full = core.std.Expr([src_luma32 * full_clip.num_frames, full_clip], 'x y - abs dup 0.015 > swap 0 ?')
         full_clip = core.std.CropRel(expr_full, 5, 5, 5, 5)
         full_clip = core.std.PlaneStats(full_clip)
-        full_clip = core.std.Cache(full_clip)
 
         tasks_pending = set()
         futures = {}
         vals = []
         full_clip_len = len(full_clip)
         for frame_index in range(len(full_clip)):
-            print(f"\r{frame_index}/{full_clip_len-1}", end="")
+            print(f"\r{frame_index}/{full_clip_len-1}", end="", file=sys.stderr)
             fut = asyncio.ensure_future(asyncio.wrap_future(full_clip.get_frame_async(frame_index)))
             tasks_pending.add(fut)
             futures[fut] = frame_index
@@ -167,7 +163,7 @@ class GetNative:
         vals += [(futures.pop(task), task.result().props.PlaneStatsAverage) for task in tasks_done]
         vals = [v for _, v in sorted(vals)]
         ratios, vals, best_value = self.analyze_results(vals)
-        print("\n")  # move the cursor, so that you not start at the end of the progress bar
+        print("\n", file=sys.stderr)  # move the cursor, so that you not start at the end of the progress bar
 
         self.txt_output += 'Raw data:\nResolution\t | Relative Error\t | Relative difference from last\n'
         self.txt_output += '\n'.join([
@@ -180,7 +176,7 @@ class GetNative:
             if not os.path.isdir(self.output_dir):
                 os.mkdir(self.output_dir)
 
-            print(f"Output Path: {self.output_dir}")
+            print(f"Output Path: {self.output_dir}", file=sys.stderr)
             for fmt in self.plot_format.replace(" ", "").split(','):
                 fig.savefig(f'{self.output_dir}/{self.filename}.{fmt}')
 
@@ -314,7 +310,8 @@ async def getnative(args: Union[List, argparse.Namespace], src: vapoursynth.Vide
     if args.steps != 1 and first_time:
         print(
             "Warning for -steps/--stepping: "
-            "If you are not completely sure what this parameter does, use the default step size.\n"
+            "If you are not completely sure what this parameter does, use the default step size.\n",
+            file=sys.stderr
         )
 
     if args.frame is None:
@@ -332,7 +329,7 @@ async def getnative(args: Union[List, argparse.Namespace], src: vapoursynth.Vide
     elif args.min_h >= args.max_h:
         raise GetnativeException(f"min_h {args.min_h} > max_h {args.max_h}? Not processable")
     elif args.max_h > src.height:
-        print(f"The image height is {src.height}, going higher is stupid! New max_h {src.height}")
+        print(f"The image height is {src.height}, going higher is stupid! New max_h {src.height}", file=sys.stderr)
         args.max_h = src.height
 
     getn = GetNative(src, scaler, args.ar, args.min_h, args.max_h, args.frame, args.mask_out, args.plot_scaling,
@@ -345,7 +342,8 @@ async def getnative(args: Union[List, argparse.Namespace], src: vapoursynth.Vide
     gc.collect()
     print(
         f"\n{scaler} AR: {args.ar:.2f} Steps: {args.steps}\n"
-        f"{best_value}\n"
+        f"{best_value}\n",
+        file=sys.stderr
     )
 
     return best_value, plot, getn
@@ -358,7 +356,7 @@ def _getnative():
         source_filter = get_attr(core, args.use)
         if not source_filter:
             raise GetnativeException(f"{args.use} is not available.")
-        print(f"Using {args.use} as source filter")
+        print(f"Using {args.use} as source filter", file=sys.stderr)
     else:
         source_filter = get_source_filter(core, imwri, args)
 
@@ -378,11 +376,9 @@ def _getnative():
     loop = asyncio.get_event_loop()
     for i, scaler in enumerate(mode):
         if scaler is not None and scaler.plugin is None:
-            print(f"Warning: No correct descale version found for {scaler}, continuing with next scaler when available.")
+            print(f"Warning: No correct descale version found for {scaler}, continuing with next scaler when available.", file=sys.stderr)
             continue
-        loop.run_until_complete(
-            getnative(args, src, scaler, first_time=True if i == 0 else False)
-        )
+        loop.run_until_complete(getnative(args, src, scaler, first_time=True if i == 0 else False))
 
 
 parser = argparse.ArgumentParser(description='Find the native resolution(s) of upscaled material (mostly anime)')
@@ -406,6 +402,7 @@ def main():
     parser.add_argument(dest='input_file', type=str, help='Absolute or relative path to the input file')
     parser.add_argument('--use', '-u', default=None, help='Use specified source filter e.g. (lsmas.LWLibavSource)')
     parser.add_argument('--mode', '-m', dest='mode', type=str, choices=_modes, default=None, help='Choose a predefined mode ["bilinear", "bicubic", "bl-bc", "all"]')
-    starttime = time.time()
+
+    start = time.time()
     _getnative()
-    print(f'done in {time.time() - starttime:.2f}s')
+    print(f'done in {time.time() - start:.2f}s', file=sys.stderr)
