@@ -373,7 +373,10 @@ def _getnative():
     elif args.mode == "all":
         mode = [s for scaler in common_scaler.values() for s in scaler]
 
-    loop = asyncio.get_event_loop()
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
     for i, scaler in enumerate(mode):
         if scaler is not None and scaler.plugin is None:
             print(f"Warning: No correct descale version found for {scaler}, continuing with next scaler when available.", file=sys.stderr)
